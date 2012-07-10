@@ -457,6 +457,67 @@ class MLB(callbacks.Plugin):
 
     mlbpowerrankings = wrap(mlbpowerrankings)
 
+    def mlbteamstats(self, irc, msg, args, optteam, optcategory):
+        """[TEAM] [category]
+        Display team leaders in stats for a specific team in category.
+        """
+
+        # we can do year
+
+        optteam = optteam.upper()
+        optcategory = optcategory.lower()
+
+        # make sure we have a valid team. Find the tID.
+        try:
+            tid = self._espntrans(optteam)
+        except KeyError:
+            irc.reply("Invalid team. Team must be one of %s" % self._validteams())
+            return
+
+        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct', 'slug':'slugAvg', 'ops':'OPS', 'sb':'stolenBases', 'runscreated':'runsCreated',
+              'w': 'wins', 'l': 'losses', 'win%': 'winPct', 'era': 'ERA',  'k': 'strikeouts', 'k/9ip': 'strikeoutsPerNineInnings', 'holds': 'holds', 's': 'saves',
+              'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP' }
+
+        # make sure we have a valid category
+        if optcategory not in category:
+            irc.reply("Error. Category must be one of: %s" % category.keys())
+            return
+
+        # build the url
+        url = 'http://m.espn.go.com/mlb/teamstats?teamId=%s&season=2012&lang=EN&category=%s&y=1&wjb=' % (tid, category[optcategory])
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to fetch: %s" % url)
+            return
+
+
+        html = html.replace('<b  >', '<b>')
+        html = html.replace('class="ind alt', 'class="ind')
+        html = html.replace('class="ind tL', 'class="ind')
+
+        # soup time.
+        soup = BeautifulSoup(html)
+
+        table = soup.find('table', attrs={'class':'table'})
+        rows = table.findAll('tr')
+
+        object_list = []
+
+        for row in rows[1:6]: # grab the first through ten.
+            rank = row.find('td', attrs={'class':'ind', 'width': '10%'}).renderContents().strip()
+            player = row.find('td', attrs={'class':'ind', 'width': '65%'}).find('a').renderContents().strip()
+            stat = row.find('td', attrs={'class':'ind', 'width': '25%'}).renderContents().strip()
+            object_list.append(rank + ". " + player + " " + stat)
+
+        thelist = string.join([item for item in object_list], " | ")
+        irc.reply("Leaders in %s for %s: %s" % (ircutils.bold(optteam.upper()), ircutils.bold(optcategory.upper()), thelist))
+
+    mlbteamstats = wrap(mlbteamstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+
+    # team leaders. Shows the top 5 teams in a category.
     def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
         """[MLB|AL|NL] [category] 
         Display leaders in category for teams in the MLB.
