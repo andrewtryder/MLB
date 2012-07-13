@@ -106,6 +106,98 @@ class MLB(callbacks.Plugin):
 
         return validteams
 
+    # display various nba award winners.
+    def mlbawards(self, irc, msg, args, optyear):
+        """<year>
+        Display various MLB awards for current (or previous) year. Use YYYY for year. Ex: 2011
+        """
+
+        if not optyear: # crude way to find the latest awards.
+            url = 'http://www.baseball-reference.com/awards/'
+            req = urllib2.Request(url)
+            response = urllib2.urlopen(req)
+            html = response.read()
+            soup = BeautifulSoup(html) #
+            link = soup.find('big', text="Baseball Award Voting Summaries").findNext('a')['href'].strip()
+            optyear = ''.join(i for i in link if i.isdigit())
+
+        url = 'http://www.baseball-reference.com/awards/awards_%s.shtml' % optyear
+        self.log.info(url)
+
+        try:
+            req = urllib2.Request(url)
+            response = urllib2.urlopen(req)
+            html = response.read()
+        except:
+            irc.reply("Failure to load: %s" % url)
+            return
+
+        # soup
+        soup = BeautifulSoup(html)
+        alvp = soup.find('h2', text="AL MVP Voting").findNext('table', attrs={'id':'AL_MVP_voting'}).findNext('a').text
+        nlvp = soup.find('h2', text="NL MVP Voting").findNext('table', attrs={'id':'NL_MVP_voting'}).findNext('a').text
+        alcy = soup.find('h2', text="AL Cy Young Voting").findNext('table', attrs={'id':'AL_Cy_Young_voting'}).findNext('a').text
+        nlcy = soup.find('h2', text="NL Cy Young Voting").findNext('table', attrs={'id':'NL_Cy_Young_voting'}).findNext('a').text
+        alroy = soup.find('h2', text="AL Rookie of the Year Voting").findNext('table', attrs={'id':'AL_Rookie_of_the_Year_voting'}).findNext('a').text
+        nlroy = soup.find('h2', text="NL Rookie of the Year Voting").findNext('table', attrs={'id':'NL_Rookie_of_the_Year_voting'}).findNext('a').text
+        almgr = soup.find('h2', text="AL Mgr of the Year Voting").findNext('table', attrs={'id':'AL_Mgr_of_the_Year_voting'}).findNext('a').text
+        nlmgr = soup.find('h2', text="NL Mgr of the Year Voting").findNext('table', attrs={'id':'NL_Mgr_of_the_Year_voting'}).findNext('a').text
+
+        output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {6} NL {7}".format(ircutils.mircColor(optyear, 'red'), \
+                ircutils.bold(alvp),ircutils.bold(nlvp),ircutils.bold(alcy),ircutils.bold(nlcy),ircutils.bold(alroy),ircutils.bold(nlroy),ircutils.bold(almgr),ircutils.bold(nlmgr))
+
+        irc.reply(output)
+
+    mlbawards = wrap(mlbawards, [optional('somethingWithoutSpaces')])
+
+
+    # display upcoming next 5 games.
+    def mlbschedule(self, irc, msg, args, optteam):
+        """[team]
+        Display the last and next five upcoming games for team.
+        """
+
+        # needs a translation table: http://sports.yahoo.com/nba/teams
+        url = 'http://sports.yahoo.com/mlb/teams/%s/calendar/rss.xml' % optteam
+
+        try:
+            req = urllib2.Request(url)
+            response = urllib2.urlopen(req)
+            html = response.read()
+        except:
+            irc.reply("Cannot open: %s" % url)
+            return
+
+        # clean this stuff up
+        html = html.replace('<![CDATA[','') #remove cdata
+        html = html.replace(']]>','') # end of cdata
+        html = html.replace('EDT','') # tidy up times
+        html = html.replace('\xc2\xa0','') # remove some stupid character.
+
+        soup = BeautifulSoup(html)
+        items = soup.find('channel').findAll('item')
+
+        append_list = []
+
+        for item in items:
+            title = item.find('title').renderContents().strip() # title is good.
+            day, date = title.split(',')
+            desc = item.find('description') # everything in desc but its messy.
+            desctext = desc.findAll(text=True) # get all text, first, but its in a list.
+            descappend = (''.join(desctext).strip()) # list transform into a string.
+            if not descappend.startswith('@'): # if something is @, it's before, but vs. otherwise.
+                descappend = 'vs. ' + descappend
+            descappend += " [" + date.strip() + "]"
+            append_list.append(descappend) # put all into a list.
+
+        self.log.info(str(append_list))
+
+        descstring = string.join([item for item in append_list], " | ")
+        output = "{0} {1}".format(ircutils.bold(optteam), descstring)
+        irc.reply(output)
+
+    mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
+
     def mlbmanager(self, irc, msg, args, optteam):
         """<team>
         Display the manager for team.
