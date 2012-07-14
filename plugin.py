@@ -106,6 +106,46 @@ class MLB(callbacks.Plugin):
 
         return validteams
 
+    # mlbstandings. use gd2 (gameday) data.
+    def mlbscores(self, irc, msg, args, optdate):
+        """
+        Display current MLB scores.
+        """
+        import xmltodict
+
+        url = 'http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_14/miniscoreboard.xml'
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to fetch: %s" % url)
+            return
+
+        doc = xmltodict.parse(html)
+        games = doc['games']['game'] # always there.
+
+        object_list = []
+
+        for each in games:
+            d = collections.OrderedDict()
+            d['outs'] = str(each.get('@outs', None))
+            d['top_inning'] = str(each.get('@top_inning', None))
+            d['inning'] = str(each.get('@inning', None))
+            d['awayteam'] = str(each.get('@away_name_abbrev', None))
+            d['hometeam'] = str(each.get('@home_name_abbrev', None))
+            d['awayruns'] = str(each.get('@away_team_runs', None))
+            d['homeruns'] = str(each.get('@home_team_runs', None))
+            d['time'] = str(each.get('@time', None))
+            d['ampm'] = str(each.get('@ampm', None))
+            d['status'] = str(each.get('@status', None))
+            object_list.append(d)
+
+        for each in object_list:
+            irc.reply(each)
+    
+    mlbscores = wrap(mlbscores, [optional('somethingWithoutSpaces')])
+
     # display various nba award winners.
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
