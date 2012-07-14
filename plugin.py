@@ -465,11 +465,16 @@ class MLB(callbacks.Plugin):
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
     
     # display short as default. offer --details option.
-    def mlbinjury(self, irc, msg, args, optteam):
+    def mlbinjury(self, irc, msg, args, optlist, optteam):
         """<--details> [TEAM]
         Show all injuries for team. Example: BOS or NYY. Use --details to 
         display full table with team injuries.
         """
+        
+        details = False
+        for (option, arg) in optlist:
+            if option == 'details':
+                details = True
         
         optteam = optteam.upper().strip()
         
@@ -509,15 +514,19 @@ class MLB(callbacks.Plugin):
         if len(object_list) < 1:
             irc.reply("No injuries for: %s" % team)
 
-        irc.reply(ircutils.underline(str(team)) + " - " + str(len(object_list)) + " total injuries")
-        irc.reply("{0:25} {1:3} {2:6} {3:<7} {4:<15} {5:<10}".format("Name","POS","Status","Date","Injury","Returns"))
+        if details:
+            irc.reply(ircutils.underline(str(team)) + " - " + str(len(object_list)) + " total injuries")
+            irc.reply("{0:25} {1:3} {2:6} {3:<7} {4:<15} {5:<10}".format("Name","POS","Status","Date","Injury","Returns"))
 
-        for inj in object_list:
-            output = "{0:27} {1:<3} {2:<6} {3:<7} {4:<15} {5:<10}".format(ircutils.bold( \
-                inj['name']),inj['position'],inj['status'],inj['date'],inj['injury'],inj['returns'])
-            irc.reply(output)
+            for inj in object_list:
+                output = "{0:27} {1:<3} {2:<6} {3:<7} {4:<15} {5:<10}".format(ircutils.bold( \
+                    inj['name']),inj['position'],inj['status'],inj['date'],inj['injury'],inj['returns'])
+                irc.reply(output)
+        else:
+            irc.reply(ircutils.underline(str(team)) + " - " + str(len(object_list)) + " total injuries")
+            irc.reply(string.join([item['name'] + " (" + item['returns'] + ")" for item in object_list], " | "))
 
-    mlbinjury = wrap(mlbinjury, [('somethingWithoutSpaces')])
+    mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
 
     #23:51 <laburd> @injury cle  returns: player 1, player 2, player 3.. on one line
     #23:51 <laburd> then if you want the injur details you do
