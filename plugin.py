@@ -9,9 +9,11 @@ from BeautifulSoup import BeautifulSoup
 import urllib2
 import re
 import collections
-from itertools import izip, chain, repeat
+from itertools import izip, chain, repeat, groupby, count # remove chain and repeat
+
 import datetime
 import string
+import sqlite3
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -37,6 +39,12 @@ class MLB(callbacks.Plugin):
         ('a','b','c'), ('d','e','f'), ('g','x','x')
         """
         return izip(*[chain(iterable, repeat(padvalue, n-1))]*n)
+
+    # http://code.activestate.com/recipes/303279/#c7
+    def _batch(self, iterable, size):
+        c = count()
+        for k, g in groupby(iterable, lambda x:c.next()//size):
+            yield g
 
     # rotoworld uses jacked up team abbrs sometimes.
     def _rototrans(self, tid):
@@ -93,27 +101,36 @@ class MLB(callbacks.Plugin):
         return fullteams[lookupkey]
 
     def _validteams(self):
-        """
-        Valid team lists for the channel.
-        """
-        validteams = ['BAL', 'BOS', 'LAA', 'CWS', 'CLE',
-                    'DET', 'KC', 'MIL', 'MIN', 'NYY', 'OAK',
-                    'SEA', 'TEX', 'TOR', 'ATL', 'CHC', 'CIN',
-                    'HOU', 'LAD', 'WSH', 'NYM', 'PHI', 'PIT', 
-                    'STL', 'SD', 'SF', 'COL', 'MIA', 'ARI', 'TB']
+        """Returns a list of valid teams for input verification."""
+        db_filename = self.registryValue('dbLocation')
+        with sqlite3.connect(db_filename) as conn:
+            cursor = conn.cursor()
+            query = "select team from mlb"
+            cursor.execute(query)
+            teamlist = []
+            for row in cursor.fetchall():
+                teamlist.append(str(row[0]))
 
-        validteams.sort()
-
-        return validteams
-
-    # mlbstandings. use gd2 (gameday) data.
+        return teamlist
+    
+    def baseball(self, irc, msg, args):
+        """Display a silly baseball."""
+        irc.reply("    ____     ")
+        irc.reply("  .'    '.   ")
+        irc.reply(" /'-....-'\  ")
+        irc.reply(" |        |  ")
+        irc.reply(" \.-''''-./  ")
+        irc.reply("  '.____.'   ")
+    baseball = wrap(baseball)
+                
+    # mlbscores. use gd2 (gameday) data.
     def mlbscores(self, irc, msg, args, optdate):
-        """
+        """[date]
         Display current MLB scores.
         """
         import xmltodict
-
-        url = 'http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_14/miniscoreboard.xml'
+                    
+        url = 'http://gd2.mlb.com/components/game/mlb/year_%s/month_%s/day_%s/miniscoreboard.xml' % (year, month, day)
 
         try:
             req = urllib2.Request(url)
@@ -162,12 +179,10 @@ class MLB(callbacks.Plugin):
             optyear = ''.join(i for i in link if i.isdigit())
 
         url = 'http://www.baseball-reference.com/awards/awards_%s.shtml' % optyear
-        self.log.info(url)
 
         try:
             req = urllib2.Request(url)
-            response = urllib2.urlopen(req)
-            html = response.read()
+            html = (urllib2.urlopen(req)).read()
         except:
             irc.reply("Failure to load: %s" % url)
             return
@@ -183,31 +198,51 @@ class MLB(callbacks.Plugin):
         almgr = soup.find('h2', text="AL Mgr of the Year Voting").findNext('table', attrs={'id':'AL_Mgr_of_the_Year_voting'}).findNext('a').text
         nlmgr = soup.find('h2', text="NL Mgr of the Year Voting").findNext('table', attrs={'id':'NL_Mgr_of_the_Year_voting'}).findNext('a').text
 
-        output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {6} NL {7}".format(ircutils.mircColor(optyear, 'red'), \
-                ircutils.bold(alvp),ircutils.bold(nlvp),ircutils.bold(alcy),ircutils.bold(nlcy),ircutils.bold(alroy),ircutils.bold(nlroy),ircutils.bold(almgr),ircutils.bold(nlmgr))
+        output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {6} NL {7}".format( \
+            ircutils.mircColor(optyear, 'red'), ircutils.bold(alvp),ircutils.bold(nlvp), \
+            ircutils.bold(alcy),ircutils.bold(nlcy),ircutils.bold(alroy),ircutils.bold(nlroy), ircutils.bold(almgr),ircutils.bold(nlmgr))
 
         irc.reply(output)
 
     mlbawards = wrap(mlbawards, [optional('somethingWithoutSpaces')])
-
+    
+    def _translateTeam(self, db, optteam):
+        """Translates optteam into proper string using database"""
+        db_filename = self.registryValue('dbLocation')
+        with sqlite3.connect(db_filename) as conn:
+            cursor = conn.cursor()
+            query = "select %s from mlb where team='%s'" % (db, optteam)
+            cursor.execute(query)
+            row = cursor.fetchone()
+            return (str(row[0]))
 
     # display upcoming next 5 games.
     def mlbschedule(self, irc, msg, args, optteam):
         """[team]
         Display the last and next five upcoming games for team.
         """
+        
+        optteam = optteam.upper().strip()
 
-        # needs a translation table: http://sports.yahoo.com/nba/teams
-        url = 'http://sports.yahoo.com/mlb/teams/%s/calendar/rss.xml' % optteam
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+            
+        lookupteam = self._translateTeam('yahoo', optteam) # returns proper yahoo team.
 
+        url = 'http://sports.yahoo.com/mlb/teams/%s/calendar/rss.xml' % lookupteam
+        
         try:
             req = urllib2.Request(url)
-            response = urllib2.urlopen(req)
-            html = response.read()
+            html = (urllib2.urlopen(req)).read()
         except:
             irc.reply("Cannot open: %s" % url)
             return
-
+            
+        if "Schedule for" not in html:
+            irc.reply("Cannot find schedule. Broken url?")
+            return
+            
         # clean this stuff up
         html = html.replace('<![CDATA[','') #remove cdata
         html = html.replace(']]>','') # end of cdata
@@ -230,20 +265,18 @@ class MLB(callbacks.Plugin):
             descappend += " [" + date.strip() + "]"
             append_list.append(descappend) # put all into a list.
 
-        self.log.info(str(append_list))
-
         descstring = string.join([item for item in append_list], " | ")
         output = "{0} {1}".format(ircutils.bold(optteam), descstring)
+        
         irc.reply(output)
 
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
 
     def mlbmanager(self, irc, msg, args, optteam):
-        """<team>
+        """[team]
         Display the manager for team.
         """
         
-        # make sure we have a valid team.
         optteam = optteam.upper().strip()
 
         if optteam not in self._validteams():
@@ -263,7 +296,6 @@ class MLB(callbacks.Plugin):
         # change some strings to parse better.
         html = html.replace('class="evenrow', 'class="oddrow')
 
-        # soupit.
         soup = BeautifulSoup(html)
         rows = soup.findAll('tr', attrs={'class':'oddrow'})
 
@@ -273,19 +305,20 @@ class MLB(callbacks.Plugin):
             manager = row.find('td').find('a')
             exp = manager.findNext('td')
             record = exp.findNext('td')
-            team = record.findNext('td').find('a')
-
+            team = record.findNext('td').find('a').renderContents().strip()
+            
             d = collections.OrderedDict()
             d['manager'] = manager.renderContents().strip()
             d['exp'] = exp.renderContents().strip()
             d['record'] = record.renderContents().strip()
-            d['team'] = self._fulltoshort(team.renderContents().strip())
+            d['team'] = self._fulltoshort(team) # fulltrans
+            #d['team'] = self._translateTeam('fulltrans', team)
             object_list.append(d)
-            # done.
 
         for each in object_list:
             if each['team'] == optteam:
-                output = "Manager of {0} is {1}({2}) with {3} years experience.".format(ircutils.bold(each['team']), ircutils.bold(each['manager']), each['record'], each['exp'])
+                output = "Manager of {0} is {1}({2}) with {3} years experience.".format( \
+                    ircutils.bold(each['team']), ircutils.bold(each['manager']), each['record'], each['exp'])
                 irc.reply(output)
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
@@ -673,26 +706,21 @@ class MLB(callbacks.Plugin):
             irc.reply("Category must be one of: %s" % category.keys())
             return
 
-
         url = 'http://m.espn.go.com/mlb/aggregates?category=%s&groupId=%s&y=1&wjb=' % (category[optcategory], league[optleague])
 
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
-            html = html.replace('class="ind alt nw"', 'class="ind nw"')
         except:
             irc.reply("Failed to fetch: %s" % url)
             return
+            
+        html = html.replace('class="ind alt nw"', 'class="ind nw"')
 
         soup = BeautifulSoup(html)
-
-        try:
-            table = soup.find('table', attrs={'class':'table'})
-            rows = table.findAll('tr')
-        except:
-            irc.reply("Could not find a table or rows for mlbteamleaders. Formatting break?")
-            return
-
+        table = soup.find('table', attrs={'class':'table'})
+        rows = table.findAll('tr')
+        
         append_list = []
         
         for row in rows[1:6]:
@@ -719,13 +747,13 @@ class MLB(callbacks.Plugin):
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
-            html = html.replace('<div class="ind alt">', '<div class="ind">') 
         except:
             irc.reply("Something broke trying to read: %s" % url)
             return
+        
+        html = html.replace('<div class="ind alt">', '<div class="ind">') 
 
         soup = BeautifulSoup(html)
-
         t1 = soup.findAll('div', attrs={'class': 'ind'})
 
         if len(t1) < 1:
@@ -744,29 +772,28 @@ class MLB(callbacks.Plugin):
         """[team]
         Show MLB transactions for [team]. Ex: NYY
         """
+        
+        optteam = optteam.upper().strip()
 
-        try:
-            tid = self._espntrans(optteam)
-        except KeyError:
-            irc.reply("Invalid team.")
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
-
-        url = 'http://m.espn.go.com/mlb/teamtransactions?teamId=%s&wjb=' % tid
+            
+        lookupteam = self._translateTeam('eid', optteam) # returns proper yahoo team.
+        
+        url = 'http://m.espn.go.com/mlb/teamtransactions?teamId=%s&wjb=' % lookupteam
 
         try:
             req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read().replace('<div class="ind tL"','<div class="ind"').replace('<div class="ind alt"','<div class="ind"')
+            html = (urllib2.urlopen(req)).read()
         except:
             irc.reply("Failed to load: %s" % url)
             return
+        
+        html = html.replace('<div class="ind tL"','<div class="ind"').replace('<div class="ind alt"','<div class="ind"')
 
         soup = BeautifulSoup(html)
-
-        try:
-            t1 = soup.findAll('div', attrs={'class': 'ind'})
-        except:
-            irc.reply("Parsing broken for: %s" % optteam)
-            return
+        t1 = soup.findAll('div', attrs={'class': 'ind'})
 
         if len(t1) < 1:
             irc.reply("No transactions found for %s" % optteam)
@@ -779,26 +806,25 @@ class MLB(callbacks.Plugin):
 
     mlbteamtrans = wrap(mlbteamtrans, [('somethingWithoutSpaces')])
 
-    def mlbtrans(self, irc, msg, args, date):
+    def mlbtrans(self, irc, msg, args, optdate):
         """[YYYYmmDD]
         Display all mlb transactions. Will only display today's. Use date in format: 20120912
         """
 
         url = 'http://m.espn.go.com/mlb/transactions?wjb='
 
-        if date:
+        if optdate:
             try:
-                time.strptime(date, '%Y%m%d') # test for valid date
+                #time.strptime(optdate, '%Y%m%d') # test for valid date
+                datetime.datetime.strptime(optdate, '%Y%m%d')
             except:
-                irc.reply("ERROR: Date format must be in YYYYMMDD")
+                irc.reply("ERROR: Date format must be in YYYYMMDD. Ex: 20120714")
                 return
         else:
             now = datetime.datetime.now()
-            date = now.strftime("%Y%m%d")
+            optdate = now.strftime("%Y%m%d")
 
-        url += '&date=%s' % date
-
-        self.log.info(url)
+        url += '&date=%s' % optdate
 
         try:
             req = urllib2.Request(url)
@@ -806,15 +832,17 @@ class MLB(callbacks.Plugin):
         except:
             irc.reply("Something broke trying to read: %s" % url)
             return
+            
+        if "No transactions today." in html:
+            irc.reply("No transactions for: %s" % optdate)
+            return
 
         soup = BeautifulSoup(html)
         t1 = soup.findAll('div', attrs={'class': 'ind alt'})
         t1 += soup.findAll('div', attrs={'class': 'ind'})
 
-        # array for out.
         out_array = []
 
-        # loop over.
         for trans in t1:
             if "<a href=" not in trans: # no links
                 match1 = re.search(r'<b>(.*?)</b><br />(.*?)</div>', str(trans), re.I|re.S) #strip out team and transaction
@@ -828,7 +856,7 @@ class MLB(callbacks.Plugin):
             for output in out_array:
                 irc.reply(output)
         else:
-            irc.reply("No transactions on %s" % date)
+            irc.reply("Did something break?")
             return
     
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
