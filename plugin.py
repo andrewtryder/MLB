@@ -9,7 +9,7 @@ from BeautifulSoup import BeautifulSoup
 import urllib2
 import re
 import collections
-from itertools import izip, chain, repeat, groupby, count # remove chain and repeat
+from itertools import izip, groupby, count
 
 import datetime
 import string
@@ -29,16 +29,14 @@ class MLB(callbacks.Plugin):
     """Add the help for "@plugin help MLB" here
     This should describe *how* to use this plugin."""
     threaded = True
-
-    # from: http://bytes.com/topic/python/answers/524017-printing-n-elements-per-line-list#post2043945
-    def _grouper(self, n, iterable, padvalue=None):
-        """
-        Return n-tuples from iterable, padding with padvalue.
-        Example:
-        grouper(3, 'abcdefg', 'x') -->
-        ('a','b','c'), ('d','e','f'), ('g','x','x')
-        """
-        return izip(*[chain(iterable, repeat(padvalue, n-1))]*n)
+   
+    def _validate(self, date, format):
+        """Check if date is valid. Return true or false"""
+        try:
+            datetime.datetime.strptime(date, format) # format = "%m/%d/%Y"
+            return True
+        except ValueError:
+            return False
 
     # http://code.activestate.com/recipes/303279/#c7
     def _batch(self, iterable, size):
@@ -113,14 +111,37 @@ class MLB(callbacks.Plugin):
 
         return teamlist
     
+    def _translateTeam(self, db, column, optteam):
+        """Translates optteam into proper string using database"""
+        db_filename = self.registryValue('dbLocation')
+        with sqlite3.connect(db_filename) as conn:
+            cursor = conn.cursor()
+            query = "select %s from mlb where %s='%s'" % (db, column, optteam)
+            self.log.info(query)
+            cursor.execute(query)
+            row = cursor.fetchone()
+            
+            return (str(row[0]))
+
+    def mlbteams(self, irc, msg, args):
+        """Display a list of valid teams for input."""
+        
+        teams = self._validteams()
+        
+        irc.reply("Valid teams are: %s" % (string.join([item for item in teams], " | ")))
+
+    mlbteams = wrap(mlbteams)
+    
     def baseball(self, irc, msg, args):
         """Display a silly baseball."""
+    
         irc.reply("    ____     ")
         irc.reply("  .'    '.   ")
         irc.reply(" /'-....-'\  ")
         irc.reply(" |        |  ")
         irc.reply(" \.-''''-./  ")
         irc.reply("  '.____.'   ")
+    
     baseball = wrap(baseball)
                 
     # mlbscores. use gd2 (gameday) data.
@@ -168,8 +189,13 @@ class MLB(callbacks.Plugin):
         """<year>
         Display various MLB awards for current (or previous) year. Use YYYY for year. Ex: 2011
         """
-
-        if not optyear: # crude way to find the latest awards.
+        
+        if optyear: # crude way to find the latest awards.
+            testdate = self._validate(optyear, '%Y')
+            if not testdate:
+                irc.reply("Invalid year. Must be YYYY.")
+                return
+        else:
             url = 'http://www.baseball-reference.com/awards/'
             req = urllib2.Request(url)
             response = urllib2.urlopen(req)
@@ -206,16 +232,6 @@ class MLB(callbacks.Plugin):
 
     mlbawards = wrap(mlbawards, [optional('somethingWithoutSpaces')])
     
-    def _translateTeam(self, db, optteam):
-        """Translates optteam into proper string using database"""
-        db_filename = self.registryValue('dbLocation')
-        with sqlite3.connect(db_filename) as conn:
-            cursor = conn.cursor()
-            query = "select %s from mlb where team='%s'" % (db, optteam)
-            cursor.execute(query)
-            row = cursor.fetchone()
-            return (str(row[0]))
-
     # display upcoming next 5 games.
     def mlbschedule(self, irc, msg, args, optteam):
         """[team]
@@ -228,7 +244,7 @@ class MLB(callbacks.Plugin):
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
             
-        lookupteam = self._translateTeam('yahoo', optteam) # returns proper yahoo team.
+        lookupteam = self._translateTeam('yahoo', 'team', optteam) # (db, column, optteam)
 
         url = 'http://sports.yahoo.com/mlb/teams/%s/calendar/rss.xml' % lookupteam
         
@@ -262,7 +278,7 @@ class MLB(callbacks.Plugin):
             descappend = (''.join(desctext).strip()) # list transform into a string.
             if not descappend.startswith('@'): # if something is @, it's before, but vs. otherwise.
                 descappend = 'vs. ' + descappend
-            descappend += " [" + date.strip() + "]"
+            descappend += " [" + date.strip() + "]" # can't translate since Yahoo! sucks with the team names here. 
             append_list.append(descappend) # put all into a list.
 
         descstring = string.join([item for item in append_list], " | ")
@@ -308,11 +324,10 @@ class MLB(callbacks.Plugin):
             team = record.findNext('td').find('a').renderContents().strip()
             
             d = collections.OrderedDict()
-            d['manager'] = manager.renderContents().strip()
+            d['manager'] = manager.renderContents().strip().replace('  ',' ') 
             d['exp'] = exp.renderContents().strip()
             d['record'] = record.renderContents().strip()
-            d['team'] = self._fulltoshort(team) # fulltrans
-            #d['team'] = self._translateTeam('fulltrans', team)
+            d['team'] = self._translateTeam('team', 'fulltrans', team) # translate from full to short
             object_list.append(d)
 
         for each in object_list:
@@ -330,7 +345,6 @@ class MLB(callbacks.Plugin):
         Display divisional standings for a division.
         """
 
-        # optlist
         expanded, vsdivision = False, False
         for (option, arg) in optlist:
             if option == 'expanded':
@@ -395,7 +409,7 @@ class MLB(callbacks.Plugin):
             if not expanded and not vsdivision:
                 poff = l10.findNext('td')
 
-            div = row.findPrevious('tr', attrs={'class':'colhead'}).findNext('td', attrs={'align':'left'}) # <tr class="colhead" align="right"><td align="left">
+            div = row.findPrevious('tr', attrs={'class':'colhead'}).findNext('td', attrs={'align':'left'}) 
 
             if vsdivision:
                 league = row.findPrevious('tr', attrs={'class':'stathead'}).findNext('td', attrs={'colspan': re.compile('^11')})
@@ -406,33 +420,29 @@ class MLB(callbacks.Plugin):
 
             # now putting into a dict. cleanup.
             d = collections.OrderedDict()
-            d['league'] = league.renderContents()
-            d['div'] = div.renderContents()
-            d['team'] = team.renderContents()
-            d['wins'] = wins.renderContents()
-            d['loss'] = loss.renderContents()
-            d['wpct'] = wpct.renderContents()
-            d['gmsb'] = gmsb.renderContents()
-            d['home'] = home.renderContents()
-            d['road'] = road.renderContents()
-            d['rs'] = rs.renderContents()
-            d['ra'] = ra.renderContents()
+            d['league'] = league.renderContents().strip()
+            d['div'] = div.renderContents().strip()
+            d['team'] = team.renderContents().strip()
+            d['wins'] = wins.renderContents().strip()
+            d['loss'] = loss.renderContents().strip()
+            d['wpct'] = wpct.renderContents().strip()
+            d['gmsb'] = gmsb.renderContents().strip()
+            d['home'] = home.renderContents().strip()
+            d['road'] = road.renderContents().strip()
+            d['rs'] = rs.renderContents().strip()
+            d['ra'] = ra.renderContents().strip()
             if expanded or vsdivision:
-                d['diff'] = diff.renderContents()
+                d['diff'] = diff.renderContents().strip()
             else:
-                d['diff'] = diff.find('span').renderContents()
-            d['strk'] = strk.renderContents()
+                d['diff'] = diff.find('span').renderContents().strip()
+            d['strk'] = strk.renderContents().strip()
             if not vsdivision:
-                d['l10'] = l10.renderContents()
+                d['l10'] = l10.renderContents().strip()
             if not expanded and not vsdivision:
-                d['poff'] = poff.renderContents()
+                d['poff'] = poff.renderContents().strip()
 
-            # and add.
             object_list.append(d)
 
-        # time for output.
-
-        # header.
         if expanded:
             header = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7} {11:6}".format( \
                     "Team", "W", "L", "PCT", "GB", "DAY", "NIGHT", "GRASS", "TURF", "1-RUN", "XTRA", "ExWL")
@@ -445,33 +455,36 @@ class MLB(callbacks.Plugin):
 
         irc.reply(header)
 
-        # now, each list.
-
         for tm in object_list:
             if tm['league'] == leaguetable[optdiv].get('league') and tm['div'] == leaguetable[optdiv].get('division'):
                 if expanded:
                     output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7} {11:6}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], tm['ra'], tm['diff'], tm['strk'], tm['l10'])
+                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
+                    tm['ra'], tm['diff'], tm['strk'], tm['l10'])
                 elif vsdivision:
                     output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], tm['ra'], tm['diff'], tm['strk'])
+                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
+                    tm['ra'], tm['diff'], tm['strk'])
                 else:
                     output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:4} {9:4} {10:<7} {11:6} {12:6}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], tm['ra'], tm['diff'], tm['strk'], tm['l10'], tm['poff']) 
+                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
+                    tm['ra'], tm['diff'], tm['strk'], tm['l10'], tm['poff']) 
 
-                # output.
                 irc.reply(output)
 
     mlbstandings = wrap(mlbstandings, [getopts({'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
     
-    # display lineups.
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
         Gets lineup for MLB team. Example: NYY
         """
 
-        optteam = optteam.upper()
+        optteam = optteam.upper().strip()
         
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+                    
         url = 'http://m.espn.go.com/mlb/lineups?wjb='
         
         try:
@@ -487,10 +500,8 @@ class MLB(callbacks.Plugin):
         html = html.replace('<b>WAS</b>','<b>WSH</b>')
         html = html.replace('<b>CHW</b>','<b>CWS</b>')
 
-        # dictionary for out.
         outdict = {}
 
-        # regex to find all and put into the dict.
         for matches in re.findall(r'<b>(\w\w+)</b>(.*?)</div>', html, re.I|re.S|re.M):
             team = matches[0].strip()
             lineup = matches[1].strip()
@@ -506,18 +517,23 @@ class MLB(callbacks.Plugin):
             return
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
-
-    #23:51 <laburd> @injury cle  returns: player 1, player 2, player 3.. on one line
-    #23:51 <laburd> then if you want the injur details you do
-    #23:51 <laburd> @injury player
-    #23:51 <laburd> It cuts the spam down by an order of magnitude
     
-    def mlbinjury(self, irc, msg, args, teamname):
-        """<TEAM>
-        Show all injuries for team. Example: BOS or NYY
+    # display short as default. offer --details option.
+    def mlbinjury(self, irc, msg, args, optteam):
+        """<--details> [TEAM]
+        Show all injuries for team. Example: BOS or NYY. Use --details to 
+        display full table with team injuries.
         """
+        
+        optteam = optteam.upper().strip()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+        
+        lookupteam = self._translateTeam('roto', 'team', optteam) 
 
-        url = 'http://rotoworld.com/teams/injuries/mlb/%s/' % teamname
+        url = 'http://rotoworld.com/teams/injuries/mlb/%s/' % lookupteam
 
         try:
             req = urllib2.Request(url)
@@ -527,13 +543,7 @@ class MLB(callbacks.Plugin):
             return
 
         soup = BeautifulSoup(html)
-
-        try:
-            team = soup.find('div', attrs={'class': 'player'}).find('a').text
-        except:
-            irc.reply("Failed to find injuries for: %s" % teamname)
-            return
-
+        team = soup.find('div', attrs={'class': 'player'}).find('a').text
         table = soup.find('table', attrs={'align': 'center', 'width': '600px;'})
         t1 = table.findAll('tr')
 
@@ -543,11 +553,11 @@ class MLB(callbacks.Plugin):
             td = row.findAll('td')
             d = collections.OrderedDict()
             d['name'] = td[0].find('a').text
-            d['position'] = td[2].renderContents()
-            d['status'] = td[3].renderContents()
-            d['date'] = td[4].renderContents().replace("&nbsp;", " ")
-            d['injury'] = td[5].renderContents()
-            d['returns'] = td[6].renderContents()
+            d['position'] = td[2].renderContents().strip()
+            d['status'] = td[3].renderContents().strip()
+            d['date'] = td[4].renderContents().strip().replace("&nbsp;", " ")
+            d['injury'] = td[5].renderContents().strip()
+            d['returns'] = td[6].renderContents().strip()
             object_list.append(d)
 
         if len(object_list) < 1:
@@ -557,11 +567,16 @@ class MLB(callbacks.Plugin):
         irc.reply("{0:25} {1:3} {2:6} {3:<7} {4:<15} {5:<10}".format("Name","POS","Status","Date","Injury","Returns"))
 
         for inj in object_list:
-            output = "{0:25} {1:<3} {2:<6} {3:<7} {4:<15} {5:<10}".format(ircutils.bold(inj['name']),inj['position'],inj['status'],inj['date'],inj['injury'],inj['returns'])
+            output = "{0:27} {1:<3} {2:<6} {3:<7} {4:<15} {5:<10}".format(ircutils.bold( \
+                inj['name']),inj['position'],inj['status'],inj['date'],inj['injury'],inj['returns'])
             irc.reply(output)
 
     mlbinjury = wrap(mlbinjury, [('somethingWithoutSpaces')])
 
+    #23:51 <laburd> @injury cle  returns: player 1, player 2, player 3.. on one line
+    #23:51 <laburd> then if you want the injur details you do
+    #23:51 <laburd> @injury player
+    #23:51 <laburd> It cuts the spam down by an order of magnitude
 
     def mlbpowerrankings(self, irc, msg, args):
         """
@@ -573,34 +588,29 @@ class MLB(callbacks.Plugin):
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
-            html = html.replace("evenrow", "oddrow")
         except:
             irc.reply("Failed to fetch: %s" % url)
             return
+            
+        html = html.replace("evenrow", "oddrow")
 
-        # soup it.
         soup = BeautifulSoup(html)
-
         table = soup.find('table', attrs={'class': 'tablehead'})
         prdate = table.find('td', attrs={'colspan': '6'}).renderContents()
-
         t1 = table.findAll('tr', attrs={'class': 'oddrow'})
 
         if len(t1) < 30:
             irc.reply("Failed to parse MLB Power Rankings. Did something break?")
             return
 
-        # object_list for ordereddict.
         object_list = []
 
         for row in t1:
-            rowrank = row.find('td', attrs={'class': 'pr-rank'}).renderContents()
-            rowteam = row.find('div', attrs={'style': re.compile('^padding.*')}).find('a').text
-            #rowteam = row.find('div', attrs={'style': 'padding\:\s10px\s0px;'}).find('a').text
-            rowrecord = row.find('span', attrs={'class': 'pr-record'}).renderContents()
-            rowlastweek = row.find('span', attrs={'class': 'pr-last'}).renderContents().replace("Last Week", "prev") 
+            rowrank = row.find('td', attrs={'class': 'pr-rank'}).renderContents().strip()
+            rowteam = row.find('div', attrs={'style': re.compile('^padding.*')}).find('a').text.strip()
+            rowrecord = row.find('span', attrs={'class': 'pr-record'}).renderContents().strip()
+            rowlastweek = row.find('span', attrs={'class': 'pr-last'}).renderContents().strip().replace("Last Week", "prev") 
 
-            # now that we get everything, dump into an ordereddict
             d = collections.OrderedDict()
             d['rank'] = int(rowrank)
             d['team'] = str(rowteam)
@@ -608,50 +618,43 @@ class MLB(callbacks.Plugin):
             d['lastweek'] = str(rowlastweek)
             object_list.append(d)
 
-        # one last sanity check.
         if len(object_list) < 30:
             irc.reply("Failed to parse the list. Check your code and formatting.")
             return
 
-        # print the date of Power Rankings
         if prdate:
             irc.reply(ircutils.mircColor(prdate, 'blue'))
 
-        # go through the list, print 6 per line.
-        for N in self._grouper(6, object_list, ''):
+        for N in self._batch(object_list, 6):
             irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['lastweek'] + ")" for n in N))
         
-
     mlbpowerrankings = wrap(mlbpowerrankings)
 
-    def mlbteamstats(self, irc, msg, args, optteam, optcategory):
+    def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """[TEAM] [category]
         Display team leaders in stats for a specific team in category.
         """
 
-        # we can do year
-
-        optteam = optteam.upper()
-        optcategory = optcategory.lower()
-
-        # make sure we have a valid team. Find the tID.
-        try:
-            tid = self._espntrans(optteam)
-        except KeyError:
-            irc.reply("Invalid team. Team must be one of %s" % self._validteams())
+        optteam = optteam.upper().strip()
+        optcategory = optcategory.lower().strip()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
+            
+        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct', 
+                    'slug':'slugAvg', 'ops':'OPS', 'sb':'stolenBases', 'runscreated':'runsCreated',
+                    'w': 'wins', 'l': 'losses', 'win%': 'winPct', 'era': 'ERA',  'k': 'strikeouts', 
+                    'k/9ip': 'strikeoutsPerNineInnings', 'holds': 'holds', 's': 'saves',
+                    'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP' }
 
-        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct', 'slug':'slugAvg', 'ops':'OPS', 'sb':'stolenBases', 'runscreated':'runsCreated',
-              'w': 'wins', 'l': 'losses', 'win%': 'winPct', 'era': 'ERA',  'k': 'strikeouts', 'k/9ip': 'strikeoutsPerNineInnings', 'holds': 'holds', 's': 'saves',
-              'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP' }
-
-        # make sure we have a valid category
         if optcategory not in category:
             irc.reply("Error. Category must be one of: %s" % category.keys())
             return
 
-        # build the url
-        url = 'http://m.espn.go.com/mlb/teamstats?teamId=%s&season=2012&lang=EN&category=%s&y=1&wjb=' % (tid, category[optcategory])
+        lookupteam = self._translateTeam('eid', 'team', optteam)
+
+        url = 'http://m.espn.go.com/mlb/teamstats?teamId=%s&season=2012&lang=EN&category=%s&y=1&wjb=' % (lookupteam, category[optcategory])
 
         try:
             req = urllib2.Request(url)
@@ -660,14 +663,11 @@ class MLB(callbacks.Plugin):
             irc.reply("Failed to fetch: %s" % url)
             return
 
-
         html = html.replace('<b  >', '<b>')
         html = html.replace('class="ind alt', 'class="ind')
         html = html.replace('class="ind tL', 'class="ind')
 
-        # soup time.
         soup = BeautifulSoup(html)
-
         table = soup.find('table', attrs={'class':'table'})
         rows = table.findAll('tr')
 
@@ -682,17 +682,15 @@ class MLB(callbacks.Plugin):
         thelist = string.join([item for item in object_list], " | ")
         irc.reply("Leaders in %s for %s: %s" % (ircutils.bold(optteam.upper()), ircutils.bold(optcategory.upper()), thelist))
 
-    mlbteamstats = wrap(mlbteamstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
-    # team leaders. Shows the top 5 teams in a category.
-    def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
+    def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
         """[MLB|AL|NL] [category] 
-        Display leaders in category for teams in the MLB.
+        Display leaders (top 5) in category for teams in the MLB.
         Categories: hr, avg, rbi, r, sb, era, whip, k 
         """
 
-        # lower both inputs.
-        league = {'mlb': '9', 'al':'7', 'nl':'8'}
+        league = {'mlb': '9', 'al':'7', 'nl':'8'} # do our own translation here for league/category.
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
 
         optleague = optleague.lower()
@@ -733,9 +731,7 @@ class MLB(callbacks.Plugin):
 
         irc.reply("Leaders in %s for %s: %s" % (ircutils.bold(optleague.upper()), ircutils.bold(optcategory.upper()), thelist))
 
-    
-    mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
+    mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbrumors(self, irc, msg, args):
         """
@@ -770,7 +766,7 @@ class MLB(callbacks.Plugin):
 
     def mlbteamtrans(self, irc, msg, args, optteam):
         """[team]
-        Show MLB transactions for [team]. Ex: NYY
+        Shows recent MLB transactions for [team]. Ex: NYY
         """
         
         optteam = optteam.upper().strip()
@@ -779,7 +775,7 @@ class MLB(callbacks.Plugin):
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
             
-        lookupteam = self._translateTeam('eid', optteam) # returns proper yahoo team.
+        lookupteam = self._translateTeam('eid', 'team', optteam) 
         
         url = 'http://m.espn.go.com/mlb/teamtransactions?teamId=%s&wjb=' % lookupteam
 
