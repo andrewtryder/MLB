@@ -44,60 +44,6 @@ class MLB(callbacks.Plugin):
         for k, g in groupby(iterable, lambda x:c.next()//size):
             yield g
 
-    # rotoworld uses jacked up team abbrs sometimes.
-    def _rototrans(self, tid):
-        rototrans = {'BAL':'BAL', 'BOS':'BOS', 'LAA':'ANA', 'CWS':'CWS', 'CLE':'CLE',
-                    'DET':'DET', 'KC':'KC', 'MIL':'MLW', 'MIN':'MIN', 'NYY':'NYY',
-                    'OAK':'OAK', 'SEA':'SEA', 'TEX':'TEX', 'TOR':'TOR', 'ATL':'ATL',
-                    'CHC':'CHC', 'CIN':'CIN', 'HOU':'HOU', 'LAD':'LA', 'WSH':'WAS',
-                    'NYM':'NYM', 'PHI':'PHI', 'PIT':'PIT', 'STL':'STL', 'SD':'SD',
-                    'SF':'SF', 'COL':'COL', 'MIA':'FLA', 'ARI':'ARZ', 'TB':'TB'}
-        return rototrans[tid]
-
-    # espn likes to use tID.
-    def _espntrans(self, tid):
-        espntrans = {'BAL':'1', 'BOS':'2', 'LAA':'3', 'CWS':'4', 'CLE':'5',
-                    'DET':'6', 'KC':'7', 'MIL':'8', 'MIN':'9', 'NYY':'10',
-                    'OAK':'11', 'SEA':'12', 'TEX':'13', 'TOR':'14', 'ATL':'15',
-                    'CHC':'16', 'CIN':'17', 'HOU':'18', 'LAD':'19', 'WSH':'20', 'WAS':'20',
-                    'NYM':'21', 'PHI':'22', 'PIT':'23', 'STL':'24', 'SD':'25',
-                    'SF':'26', 'SFG':'26', 'COL':'27', 'MIA':'28', 'ARI':'29', 'TB':'30'}
-        return espntrans[tid]
-
-    def _fulltoshort(self, lookupkey):
-        fullteams = {   'Arizona Diamondbacks':'ARI', 'Arizona':'ARI',
-                        'Atlanta Braves':'ATL', 'Atlanta':'ATL',
-                        'Baltimore Orioles':'BAL', 'Baltimore':'BAL',
-                        'Boston Red Sox': 'BOS', 'Boston':'BOS',
-                        'Chicago Cubs': 'CHC', 'Chicago Cubs':'CHC',
-                        'Chicago White Sox': 'CWS', 'Chicago Sox':'CWS',
-                        'Cincinnati Reds': 'CIN', 'Cincinnati':'CIN',
-                        'Cleveland Indians': 'CLE', 'Cleveland':'CLE',
-                        'Colorado Rockies': 'COL', 'Colorado':'COL',
-                        'Detroit Tigers': 'DET', 'Detroit':'DET',
-                        'Houston Astros': 'HOU', 'Houston':'HOU',
-                        'Kansas City Royals': 'KC', 'Kansas City':'KC',
-                        'Los Angeles Angels': 'LAA', 'LA Angels':'LAA',
-                        'Los Angeles Dodgers': 'LAD', 'LA Dodgers':'LAD',
-                        'Miami Marlins':'MIA', 'Miami':'MIA',
-                        'Milwaukee Brewers':'MIL', 'Milwaukee':'MIL',
-                        'Minnesota Twins':'MIN', 'Minnesota':'MIN',
-                        'New York Mets':'NYM', 'NY Mets':'NYM',
-                        'New York Yankees':'NYY', 'NY Yankees':'NYY',
-                        'Oakland Athletics':'OAK', 'Oakland':'OAK',
-                        'Philadelphia Phillies':'PHI', 'Philadelphia':'PHI',
-                        'Pittsburgh Pirates':'PIT', 'Pittsburgh':'PIT',
-                        'San Diego Padres':'SD', 'San Diego':'SD',
-                        'San Francisco Giants': 'SF', 'San Francisco':'SF',
-                        'Seattle Mariners':'SEA', 'Seattle':'SEA',
-                        'St. Louis Cardinals':'STL', 'St. Louis':'STL',
-                        'Tampa Bay Rays':'TB', 'Tampa Bay':'TB',
-                        'Texas Rangers':'TEX', 'Texas':'TEX',
-                        'Toronto Blue Jays':'TOR', 'Toronto':'TOR',
-                        'Washington Nationals':'WAS', 'Washington':'WAS'
-                    }
-        return fullteams[lookupkey]
-
     def _validteams(self):
         """Returns a list of valid teams for input verification."""
         db_filename = self.registryValue('dbLocation')
