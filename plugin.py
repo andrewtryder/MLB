@@ -106,47 +106,6 @@ class MLB(callbacks.Plugin):
 
         return validteams
 
-    def mlbscores(self, irc, msg, args, optdate):
-        """
-        Display MLB scores.
-        """
-
-        # http://m.espn.go.com/mlb/scoreboard?date=20120714&wjb=
-        url = 'http://m.espn.go.com/mlb/scoreboard?&wjb='
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-            html = html.replace('class="ind alt', 'class="ind')
-        except:
-            irc.reply("Failed to open: %s" % url)
-            return
-
-        # one sanity check before soup.
-        if "No games" in html:
-            irc.reply("No games on today.")
-            return
-
-        soup = BeautifulSoup(html)
-        rows = soup.findAll('div', attrs={'class':'ind', 'style':'white-space: nowrap;'})
-
-        object_list = []
-
-        for row in rows:
-            game = row.find('a').text.strip() # rather simple parse here.
-            game = re.sub(',.*?$', '', game) # remove everything after comma
-            game = game.replace('Bot ','B').replace('th','').replace('rd','') # replace Bot with B. remove th and rd.
-            game = game.replace('Top ','T').replace('nd','') # replace Top with T. remove nd.
-            game = game.replace('Mid ','M').replace('st','') # replace Mid with M. remove st.
-            object_list.append(game)
-
-        allgames = string.join([item for item in object_list], " | ")
-
-        irc.reply(allgames)
-
-    mlbscores = wrap(mlbscores, [optional('somethingWithoutSpaces')])
-
-
     # display various nba award winners.
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
