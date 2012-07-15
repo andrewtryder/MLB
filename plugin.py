@@ -404,7 +404,8 @@ class MLB(callbacks.Plugin):
             if expanded or vsdivision:
                 d['diff'] = diff.renderContents().strip()
             else:
-                d['diff'] = diff.find('span').renderContents().strip()
+                #d['diff'] = diff.find('span').renderContents().strip()
+                d['diff'] = diff.find('span', text=True)
             d['strk'] = strk.renderContents().strip()
             if not vsdivision:
                 d['l10'] = l10.renderContents().strip()
