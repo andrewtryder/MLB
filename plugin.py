@@ -9,11 +9,10 @@ from BeautifulSoup import BeautifulSoup
 import urllib2
 import re
 import collections
-from itertools import izip, groupby, count
-
 import datetime
 import string
 import sqlite3
+from itertools import izip, groupby, count
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -31,13 +30,23 @@ class MLB(callbacks.Plugin):
     threaded = True
    
     def _validate(self, date, format):
-        """Check if date is valid. Return true or false"""
+        """Return true or false for valid date based on format."""
         try:
             datetime.datetime.strptime(date, format) # format = "%m/%d/%Y"
             return True
         except ValueError:
             return False
 
+    def _b64encode(self, string):
+        """Returns base64 encoded string."""
+        import base64
+        return base64.b64encode(string)
+
+    def _b64decode(self, string):
+        """Returns base64 encoded string."""
+        import base64
+        return base64.b64decode(string)
+        
     # http://code.activestate.com/recipes/303279/#c7
     def _batch(self, iterable, size):
         c = count()
@@ -72,8 +81,7 @@ class MLB(callbacks.Plugin):
     def mlbteams(self, irc, msg, args):
         """Display a list of valid teams for input."""
         
-        teams = self._validteams()
-        
+        teams = self._validteams()        
         irc.reply("Valid teams are: %s" % (string.join([item for item in teams], " | ")))
 
     mlbteams = wrap(mlbteams)
@@ -95,9 +103,23 @@ class MLB(callbacks.Plugin):
         """[date]
         Display current MLB scores.
         """
+        
         import xmltodict
-                    
-        url = 'http://gd2.mlb.com/components/game/mlb/year_%s/month_%s/day_%s/miniscoreboard.xml' % (year, month, day)
+        
+        if optdate: 
+            testdate = self._validate(optdate, '%Y%m%d')
+            if not testdate:
+                irc.reply("Invalid year. Must be YYYYmmdd.")
+                return
+            else:
+                _year = optdate[0:4]
+                _month = optdate[4:6]
+                _day = optdate[6:8]
+        else:
+            (_month, _day, _year) = datetime.date.today().strftime("%m/%d/%Y").split('/')
+        
+        url = 'http://gd2.mlb.com/components/game/mlb/year_%s/month_%s/day_%s/miniscoreboard.xml' % (_year, _month, _day)
+        self.log.info(url)
 
         try:
             req = urllib2.Request(url)
@@ -108,6 +130,10 @@ class MLB(callbacks.Plugin):
 
         doc = xmltodict.parse(html)
         games = doc['games']['game'] # always there.
+        
+        if len(games) < 1:
+            irc.reply("We failed to find any games for that day")
+            return
 
         object_list = []
 
@@ -130,7 +156,6 @@ class MLB(callbacks.Plugin):
     
     mlbscores = wrap(mlbscores, [optional('somethingWithoutSpaces')])
 
-    # display various nba award winners.
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
         Display various MLB awards for current (or previous) year. Use YYYY for year. Ex: 2011
@@ -142,7 +167,7 @@ class MLB(callbacks.Plugin):
                 irc.reply("Invalid year. Must be YYYY.")
                 return
         else:
-            url = 'http://www.baseball-reference.com/awards/'
+            url = self._b64decode('aHR0cDovL3d3dy5iYXNlYmFsbC1yZWZlcmVuY2UuY29tL2F3YXJkcy8=')
             req = urllib2.Request(url)
             response = urllib2.urlopen(req)
             html = response.read()
@@ -150,7 +175,7 @@ class MLB(callbacks.Plugin):
             link = soup.find('big', text="Baseball Award Voting Summaries").findNext('a')['href'].strip()
             optyear = ''.join(i for i in link if i.isdigit())
 
-        url = 'http://www.baseball-reference.com/awards/awards_%s.shtml' % optyear
+        url = self._b64decode('aHR0cDovL3d3dy5iYXNlYmFsbC1yZWZlcmVuY2UuY29tL2F3YXJkcy8=') + 'awards_%s.shtml' % optyear
 
         try:
             req = urllib2.Request(url)
@@ -170,7 +195,7 @@ class MLB(callbacks.Plugin):
         almgr = soup.find('h2', text="AL Mgr of the Year Voting").findNext('table', attrs={'id':'AL_Mgr_of_the_Year_voting'}).findNext('a').text
         nlmgr = soup.find('h2', text="NL Mgr of the Year Voting").findNext('table', attrs={'id':'NL_Mgr_of_the_Year_voting'}).findNext('a').text
 
-        output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {6} NL {7}".format( \
+        output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {7} NL {8}".format( \
             ircutils.mircColor(optyear, 'red'), ircutils.bold(alvp),ircutils.bold(nlvp), \
             ircutils.bold(alcy),ircutils.bold(nlcy),ircutils.bold(alroy),ircutils.bold(nlroy), ircutils.bold(almgr),ircutils.bold(nlmgr))
 
@@ -245,8 +270,7 @@ class MLB(callbacks.Plugin):
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
 
-        # build the url and request.
-        url = 'http://espn.go.com/mlb/managers'
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9tYW5hZ2Vycw==')
 
         try:
             req = urllib2.Request(url)
@@ -431,7 +455,7 @@ class MLB(callbacks.Plugin):
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
                     
-        url = 'http://m.espn.go.com/mlb/lineups?wjb='
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xpbmV1cHM/d2piPQ==')
         
         try:
             req = urllib2.Request(url)
@@ -484,7 +508,7 @@ class MLB(callbacks.Plugin):
         
         lookupteam = self._translateTeam('roto', 'team', optteam) 
 
-        url = 'http://rotoworld.com/teams/injuries/mlb/%s/' % lookupteam
+        url = self._b64decode('aHR0cDovL3JvdG93b3JsZC5jb20vdGVhbXMvaW5qdXJpZXMvbWxi') + '/%s/' % lookupteam
 
         try:
             req = urllib2.Request(url)
@@ -538,7 +562,7 @@ class MLB(callbacks.Plugin):
         Display this week's MLB Power Rankings.
         """
         
-        url = 'http://espn.go.com/mlb/powerrankings' 
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9wb3dlcnJhbmtpbmdz')
 
         try:
             req = urllib2.Request(url)
@@ -588,6 +612,7 @@ class MLB(callbacks.Plugin):
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """[TEAM] [category]
         Display team leaders in stats for a specific team in category.
+        Ex. NYY hr
         """
 
         optteam = optteam.upper().strip()
@@ -609,7 +634,8 @@ class MLB(callbacks.Plugin):
 
         lookupteam = self._translateTeam('eid', 'team', optteam)
 
-        url = 'http://m.espn.go.com/mlb/teamstats?teamId=%s&season=2012&lang=EN&category=%s&y=1&wjb=' % (lookupteam, category[optcategory])
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW1zdGF0cw==') + '?teamId=%s&lang=EN&category=%s&y=1&wjb=' % (lookupteam, category[optcategory]) 
+        # &season=2012
 
         try:
             req = urllib2.Request(url)
@@ -659,7 +685,7 @@ class MLB(callbacks.Plugin):
             irc.reply("Category must be one of: %s" % category.keys())
             return
 
-        url = 'http://m.espn.go.com/mlb/aggregates?category=%s&groupId=%s&y=1&wjb=' % (category[optcategory], league[optleague])
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2FnZ3JlZ2F0ZXM=') + '?category=%s&groupId=%s&y=1&wjb=' % (category[optcategory], league[optleague])
 
         try:
             req = urllib2.Request(url)
@@ -693,7 +719,7 @@ class MLB(callbacks.Plugin):
         Display the latest mlb rumors.
         """
 
-        url = 'http://m.espn.go.com/mlb/rumors?wjb='
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3J1bW9ycz93amI9')
 
         try:
             req = urllib2.Request(url)
@@ -711,7 +737,6 @@ class MLB(callbacks.Plugin):
             irc.reply("No mlb rumors found. Check formatting?")
             return
         for t1rumor in t1[0:7]:
-            # dont print <a href="/mlb/
             item = t1rumor.find('div', attrs={'class': 'noborder bold tL'}).renderContents()
             item = re.sub('<[^<]+?>', '', item)
             rumor = t1rumor.find('div', attrs={'class': 'inline rumorContent'}).renderContents().replace('\r','')
@@ -732,7 +757,7 @@ class MLB(callbacks.Plugin):
             
         lookupteam = self._translateTeam('eid', 'team', optteam) 
         
-        url = 'http://m.espn.go.com/mlb/teamtransactions?teamId=%s&wjb=' % lookupteam
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW10cmFuc2FjdGlvbnM=') + '?teamId=%s&wjb=' % lookupteam
 
         try:
             req = urllib2.Request(url)
@@ -762,7 +787,7 @@ class MLB(callbacks.Plugin):
         Display all mlb transactions. Will only display today's. Use date in format: 20120912
         """
 
-        url = 'http://m.espn.go.com/mlb/transactions?wjb='
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RyYW5zYWN0aW9ucz93amI9')
 
         if optdate:
             try:
@@ -812,7 +837,7 @@ class MLB(callbacks.Plugin):
     
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
 
-    def mlbprob(self, irc, msg, args, optdate, optteam):
+    def mlbprob(self, irc, msg, args, optteam):
         """[YYYYMMDD] <TEAM>
         Display the MLB probables for date. Defaults to today. To search
         for a specific team, use their abbr. like NYY
@@ -823,56 +848,62 @@ class MLB(callbacks.Plugin):
         # with no optdate and optteam, show whatever the stuff today is.
         # with optdate and no optteam, show all matches that day.
 
+        optteam = optteam.upper().strip()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+
         dates = []
         date = datetime.date.today()
         dates.append(date)
 
         for i in range(4):
-                date += datetime.timedelta(days=1)
-                dates.append(date)
+            date += datetime.timedelta(days=1)
+            dates.append(date)
 
         out_array = []
 
         for eachdate in dates:
-                outdate = eachdate.strftime("%Y%m%d")
-                url = 'http://m.espn.go.com/mlb/probables?wjb=&date=%s' % outdate # date=20120630&wjb=
+            outdate = eachdate.strftime("%Y%m%d")
+            #url = 'http://m.espn.go.com/mlb/probables?wjb=&date=%s' % outdate # date=20120630&wjb=
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3Byb2JhYmxlcz93amI9') + '&date=%s' % outdate
 
-                try:
-                    req = urllib2.Request(url)
-                    html = (urllib2.urlopen(req)).read().replace("ind alt tL spaced", "ind tL spaced")
-                except:
-                    irc.reply("Failed to load: %s" % url)
-                    return
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read().replace("ind alt tL spaced", "ind tL spaced")
+    
+            if "No Games Scheduled" in html:
+                next
 
-                if "No Games Scheduled" in html:
-                    irc.reply("No games scheduled this day.")
-                    next
+            # fix some teams here. stupid espn.
+            html = html.replace('WAS','WSH').replace('CHW','CWS').replace('KAN','KC').replace('TAM','TB').replace('SFO','SF').replace('SDG','SD')
+    
+            soup = BeautifulSoup(html)
+            t1 = soup.findAll('div', attrs={'class': 'ind tL spaced'})
 
-                soup = BeautifulSoup(html)
-                t1 = soup.findAll('div', attrs={'class': 'ind tL spaced'})
-
-                for row in t1:
-                    matchup = row.find('a', attrs={'class': 'bold inline'}).text.strip()
-                    textmatch = re.search(r'<a class="bold inline".*?<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)$', row.renderContents(), re.I|re.S|re.M)
+            for row in t1:
+                matchup = row.find('a', attrs={'class': 'bold inline'}).text.strip()
+                textmatch = re.search(r'<a class="bold inline".*?<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)$', row.renderContents(), re.I|re.S|re.M)
+                
+                if textmatch:
                     d = collections.OrderedDict()
                     d['date'] = outdate
                     d['matchup'] = matchup
-
-                    if textmatch:
-                        d['vteam'] = textmatch.group(1).strip().replace(':','')
-                        d['vpitcher'] = textmatch.group(2).strip()
-                        d['vpstats'] = textmatch.group(3).strip()
-                        d['hteam'] = textmatch.group(4).strip().replace(':','')
-                        d['hpitcher'] = textmatch.group(5).strip()
-                        d['hpstats'] = textmatch.group(6).strip()
-                        out_array.append(d)
+                    d['vteam'] = textmatch.group(1).strip().replace(':','')
+                    d['vpitcher'] = textmatch.group(2).strip()
+                    d['vpstats'] = textmatch.group(3).strip()
+                    d['hteam'] = textmatch.group(4).strip().replace(':','')
+                    d['hpitcher'] = textmatch.group(5).strip()
+                    d['hpstats'] = textmatch.group(6).strip()
+                    out_array.append(d)
         
         for eachentry in out_array:
             if optteam:
                 if optteam in eachentry['matchup']:
-                    irc.reply("{0:25} {1:4} {2:15} {3:12} {4:4} {5:15} {6:12}".format(matchup, vteam, vpitcher,vpstats, hteam, hpitcher, hpstats))
+                    irc.reply("{0:25} {1:4} {2:15} {3:12} {4:4} {5:15} {6:12} {7:10}".format(eachentry['matchup'], eachentry['vteam'], \
+                        eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats'], eachentry['date']))
 
-    mlbprob = wrap(mlbprob, [optional('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
+    mlbprob = wrap(mlbprob, [optional('somethingWithoutSpaces')])
 
 Class = MLB
 
