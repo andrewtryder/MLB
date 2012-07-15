@@ -552,11 +552,6 @@ class MLB(callbacks.Plugin):
 
     mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
 
-    #23:51 <laburd> @injury cle  returns: player 1, player 2, player 3.. on one line
-    #23:51 <laburd> then if you want the injur details you do
-    #23:51 <laburd> @injury player
-    #23:51 <laburd> It cuts the spam down by an order of magnitude
-
     def mlbpowerrankings(self, irc, msg, args):
         """
         Display this week's MLB Power Rankings.
@@ -866,7 +861,6 @@ class MLB(callbacks.Plugin):
 
         for eachdate in dates:
             outdate = eachdate.strftime("%Y%m%d")
-            #url = 'http://m.espn.go.com/mlb/probables?wjb=&date=%s' % outdate # date=20120630&wjb=
             url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3Byb2JhYmxlcz93amI9') + '&date=%s' % outdate
 
             req = urllib2.Request(url)
