@@ -98,6 +98,49 @@ class MLB(callbacks.Plugin):
     
     baseball = wrap(baseball)
     
+    def mlbvaluations(self, irc, msg, args):
+        """Display current MLB team valuations from Forbes."""
+        
+        url = 'http://www.forbes.com/mlb-valuations/list/'
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to load: %s" % url)
+            return
+ 
+        soup = BeautifulSoup(html)
+        tbody = soup.find('tbody', attrs={'id':'listbody'})
+        rows = tbody.findAll('tr')
+
+        object_list = []
+
+        for row in rows:
+            rank = row.find('td', attrs={'class':'rank'})
+            team = rank.findNext('td')
+            value = team.findNext('td')
+            yrchange = value.findNext('td')
+            debtvalue = yrchange.findNext('td')
+            revenue = debtvalue.findNext('td')
+            operinc = revenue.findNext('td')
+            d = collections.OrderedDict()
+            d['rank'] = rank.renderContents().strip()
+            d['team'] = team.find('h3').renderContents().strip()
+            d['value'] = value.renderContents().strip()
+            d['yrchange'] = yrchange.renderContents().strip()
+            d['debtvalue'] = debtvalue.renderContents().strip()
+            d['revenue'] = revenue.renderContents().strip()
+            d['operinc'] = operinc.renderContents().strip()
+            object_list.append(d)
+        
+        irc.reply(ircutils.mircColor("Current MLB Team Values", 'red') + " (in millions):")
+        
+        for N in self._batch(object_list, 7):
+            irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + ")" for n in N))        
+            
+    mlbvaluations = wrap(mlbvaluations)
+
     def mlbplayoffs(self, irc, msg, args):
         """Display playoff matchups if season ended today."""
     
@@ -233,7 +276,6 @@ class MLB(callbacks.Plugin):
 
     mlbawards = wrap(mlbawards, [optional('somethingWithoutSpaces')])
     
-    # display upcoming next 5 games.
     def mlbschedule(self, irc, msg, args, optteam):
         """[team]
         Display the last and next five upcoming games for team.
@@ -247,8 +289,8 @@ class MLB(callbacks.Plugin):
             
         lookupteam = self._translateTeam('yahoo', 'team', optteam) # (db, column, optteam)
 
-        url = 'http://sports.yahoo.com/mlb/teams/%s/calendar/rss.xml' % lookupteam
-        
+        url = self._b64decode('aHR0cDovL3Nwb3J0cy55YWhvby5jb20vbWxiL3RlYW1z') + '/%s/calendar/rss.xml' % lookupteam
+
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
@@ -264,7 +306,7 @@ class MLB(callbacks.Plugin):
         html = html.replace('<![CDATA[','') #remove cdata
         html = html.replace(']]>','') # end of cdata
         html = html.replace('EDT','') # tidy up times
-        html = html.replace('\xc2\xa0','') # remove some stupid character.
+        html = html.replace('\xc2\xa0',' ') # remove some stupid character.
 
         soup = BeautifulSoup(html)
         items = soup.find('channel').findAll('item')
@@ -338,7 +380,6 @@ class MLB(callbacks.Plugin):
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
-    # alternative: http://erikberg.com/mlb/standings-wildcard.xml
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """<--expanded|--vsdivision> [ALE|ALC|ALW|NLC|NLC|NLW]
         Display divisional standings for a division. Use --expanded or --vsdivision
@@ -630,7 +671,7 @@ class MLB(callbacks.Plugin):
 
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """[TEAM] [category]
-        Display team leaders in stats for a specific team in category.
+        Display leaders on a team in stats for a specific category.
         Ex. NYY hr
         """
 
@@ -687,11 +728,11 @@ class MLB(callbacks.Plugin):
     def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
         """[MLB|AL|NL] [category] 
         Display leaders (top 5) in category for teams in the MLB.
-        Categories: hr, avg, rbi, r, sb, era, whip, k 
+        Categories: hr, avg, rbi, ra, sb, era, whip, k 
         """
 
         league = {'mlb': '9', 'al':'7', 'nl':'8'} # do our own translation here for league/category.
-        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
+        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'ra':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
 
         optleague = optleague.lower()
         optcategory = optcategory.lower()
