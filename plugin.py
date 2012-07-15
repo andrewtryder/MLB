@@ -97,7 +97,37 @@ class MLB(callbacks.Plugin):
         irc.reply("  '.____.'   ")
     
     baseball = wrap(baseball)
-                
+    
+    def mlbplayoffs(self, irc, msg, args):
+        """Display playoff matchups if season ended today."""
+    
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply('Failed to fetch: %s' % (self._b64decode('url')))
+            return
+        
+        soup = BeautifulSoup(html)
+        each = soup.findAll('td', attrs={'width':'25%'})
+
+        ol = []
+
+        for ea in each: # man is this just a horrible stopgap. 
+            links = ea.findAll('a')
+            for link in links:
+                linksplit = link['href'].split('/')
+                team = linksplit[7]
+                ol.append(team.upper())
+
+        irc.reply("Playoffs: AL ({0} vs {1}) vs. {2} | {3} vs. {4} || NL: ({5} vs. {6}) vs. {7} | {8} vs. {9}".format(\
+            ircutils.bold(ol[0]), ircutils.bold(ol[1]), ircutils.bold(ol[2]), ircutils.bold(ol[3]), ircutils.bold(ol[4]),\
+            ircutils.bold(ol[5]), ircutils.bold(ol[6]), ircutils.bold(ol[7]), ircutils.bold(ol[8]), ircutils.bold(ol[9])))
+    
+    mlbplayoffs = wrap(mlbplayoffs)
+                    
     # mlbscores. use gd2 (gameday) data.
     def mlbscores(self, irc, msg, args, optdate):
         """[date]
@@ -309,10 +339,10 @@ class MLB(callbacks.Plugin):
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
     # alternative: http://erikberg.com/mlb/standings-wildcard.xml
-    # http://espn.go.com/mlb/standings/_/type/wild-card
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
-        """<ALE|ALC|ALW|NLC|NLC|NLW>
-        Display divisional standings for a division.
+        """<--expanded|--vsdivision> [ALE|ALC|ALW|NLC|NLC|NLW]
+        Display divisional standings for a division. Use --expanded or --vsdivision
+        to show extended stats.
         """
 
         expanded, vsdivision = False, False
@@ -322,7 +352,6 @@ class MLB(callbacks.Plugin):
             if option == 'vsdivision':
                 vsdivision = True
 
-        # lower the div to match against leaguetable
         optdiv = optdiv.lower()
         leaguetable =   { 
                             'ale': {'league':'American League', 'division':'EAST' },
@@ -333,18 +362,16 @@ class MLB(callbacks.Plugin):
                             'nlw': {'league':'National League', 'division':'WEST' }
                         }
 
-        # sanity check to make sure we have a league.
         if optdiv not in leaguetable:
             irc.reply("League must be one of: %s" % leaguetable.keys())
             return
 
-        # now, go to work.
         if expanded:
-            url = 'http://espn.go.com/mlb/standings/_/type/expanded'
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL2V4cGFuZGVk')
         elif vsdivision:
-            url = 'http://espn.go.com/mlb/standings/_/type/vs-division'
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3ZzLWRpdmlzaW9u')
         else:
-            url = 'http://espn.go.com/mlb/standings'
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3M=')
 
         try:
             req = urllib2.Request(url)
@@ -353,10 +380,8 @@ class MLB(callbacks.Plugin):
             irc.reply("Problem opening up: %s" % url)
             return
         
-        # change to help parsing rows
         html = html.replace('class="evenrow', 'class="oddrow')
 
-        # soup time.
         soup = BeautifulSoup(html)
         rows = soup.findAll('tr', attrs={'class': re.compile('^oddrow*')})
 
@@ -388,7 +413,6 @@ class MLB(callbacks.Plugin):
             else:
                 league = row.findPrevious('tr', attrs={'class':'stathead'}).findNext('td', attrs={'colspan': re.compile('^13')})
 
-            # now putting into a dict. cleanup.
             d = collections.OrderedDict()
             d['league'] = league.renderContents().strip()
             d['div'] = div.renderContents().strip()
@@ -404,7 +428,6 @@ class MLB(callbacks.Plugin):
             if expanded or vsdivision:
                 d['diff'] = diff.renderContents().strip()
             else:
-                #d['diff'] = diff.find('span').renderContents().strip()
                 d['diff'] = diff.find('span', text=True)
             d['strk'] = strk.renderContents().strip()
             if not vsdivision:
