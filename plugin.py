@@ -91,9 +91,9 @@ class MLB(callbacks.Plugin):
     
         irc.reply("    ____     ")
         irc.reply("  .'    '.   ")
-        irc.reply(" /'-....-'\  ")
+        irc.reply(" /"+ircutils.mircColor("'-....-'", 'red') + "\  ")
         irc.reply(" |        |  ")
-        irc.reply(" \.-''''-./  ")
+        irc.reply(" \\"+ircutils.mircColor(".-''''-.", 'red') + "/  ")
         irc.reply("  '.____.'   ")
     
     baseball = wrap(baseball)
