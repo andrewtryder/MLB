@@ -553,7 +553,6 @@ class MLB(callbacks.Plugin):
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
     
-    # display short as default. offer --details option.
     def mlbinjury(self, irc, msg, args, optlist, optteam):
         """<--details> [TEAM]
         Show all injuries for team. Example: BOS or NYY. Use --details to 
@@ -583,7 +582,11 @@ class MLB(callbacks.Plugin):
             return
 
         soup = BeautifulSoup(html)
-        team = soup.find('div', attrs={'class': 'player'}).find('a').text
+        if soup.find('div', attrs={'class': 'player'}):
+            team = soup.find('div', attrs={'class': 'player'}).find('a').text
+        else:
+            irc.reply("No injuries found for: %s" % optteam)
+            return
         table = soup.find('table', attrs={'align': 'center', 'width': '600px;'})
         t1 = table.findAll('tr')
 
@@ -601,7 +604,7 @@ class MLB(callbacks.Plugin):
             object_list.append(d)
 
         if len(object_list) < 1:
-            irc.reply("No injuries for: %s" % team)
+            irc.reply("No injuries for: %s" % optteam)
 
         if details:
             irc.reply(ircutils.underline(str(team)) + " - " + str(len(object_list)) + " total injuries")
@@ -656,10 +659,6 @@ class MLB(callbacks.Plugin):
             d['record'] = str(rowrecord)
             d['lastweek'] = str(rowlastweek)
             object_list.append(d)
-
-        if len(object_list) < 30:
-            irc.reply("Failed to parse the list. Check your code and formatting.")
-            return
 
         if prdate:
             irc.reply(ircutils.mircColor(prdate, 'blue'))
@@ -818,6 +817,7 @@ class MLB(callbacks.Plugin):
         lookupteam = self._translateTeam('eid', 'team', optteam) 
         
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW10cmFuc2FjdGlvbnM=') + '?teamId=%s&wjb=' % lookupteam
+        self.log.info(url)
 
         try:
             req = urllib2.Request(url)
