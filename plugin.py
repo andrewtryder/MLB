@@ -170,7 +170,106 @@ class MLB(callbacks.Plugin):
             ircutils.bold(ol[5]), ircutils.bold(ol[6]), ircutils.bold(ol[7]), ircutils.bold(ol[8]), ircutils.bold(ol[9])))
     
     mlbplayoffs = wrap(mlbplayoffs)
-                    
+
+    def mlbcareerleaders(self, irc, msg, args, optplayertype, optcategory):
+        """[batting|pitching] [category]
+        Must specify batting or pitching.
+        Display career leaders in a specific stat.
+        """
+
+        optplayertype = optplayertype.lower()
+        
+        battingcategories = { 'batavg':'batting_avg', 'onbasepct':'onbase_perc', 'sluggingpct':'slugging_perc' , 
+                            'onbaseplusslugging':'onbase_plus_slugging', 'gamesplayedAB':'G', 'atbats':'AB', 'plateappear':'PA',
+                            'runsscored':'R', 'hitsAB':'H', 'totalbases':'TB', 'doubles':'2B', 'triples':'3B', 'homeruns':'HR',
+                            'runsbattedin':'RBI', 'basesonballs':'BB', 'strikeouts':'SO', 'singles':'1B', 'runscreated':'RC',
+                            'timesonbase':'TOB', 'offwinpct':'offensive_winning_perc', 'hitbypitchAB':'HBP', 'sachits':'SH', 'sacflies':'SF',
+                            'intbasesonballs':'IBB', 'dpgroundedinto':'GIDP', 'caughtstealing':'CS','SBpct':'stolen_base_perc',
+                            'powerspeednum':'power_speed_number', 'ABperSO':'at_bats_per_strikeout', 'ABperHR':'at_bats_per_home_run',
+                            'outsmade':'outs_made'
+                            }
+        pitchingcategories = { 'warforpitchers':'WAR_pitch', 'ERA':'earned_run_avg', 'wins':'W', 'winlosspct':'win_loss_perc',
+                            'walksnhitsperIP':'whip', 'hitsper9IP':'hits_per_nine', 'bobper9IP':'bases_on_balls_per_nine',
+                            'SOper9IP':'strikeouts_per_nine', 'gamesplayedpitching':'G_p', 'saves':'SV', 'inningspitched':'IP',
+                            'strikeouts':'SO_p', 'gamesstarted':'GS', 'completegames':'CG', 'shutouts':'SHO', 'homerunsallowed':'HR_p',
+                            'baseonballsallowed':'BP_p', 'hitsallowed':'H_p', 'SOnBOB':'strikeouts_per_base_on_balls', 'HRper9IP':'home_runs_per_nine',
+                            'losses':'L', 'earnedruns':'ER', 'wildpitches':'WP', 'hitbypitch':'HBP_p', 'battersfaced':'batters_faced',
+                            'gamesfinished':'GF', 'adjustedERAplus':'earned_run_avg_plus', 'adjpitchingruns':'apRuns', 'adjpitchingwins':'apWins'
+                            }
+        
+        # be able to not give a category to get them.
+        if optplayertype == "batting":
+            if not optcategory:
+                irc.reply("Batting Categories: %s" % battingcategories.keys())
+                return
+            else:
+                optcategory = optcategory.lower()
+
+                if optcategory not in battingcategories:
+                    irc.reply("Stat must be one of: %s" % battingcategories.keys())
+                    return
+                else:
+                    endurl = '%s_career.shtml' % battingcategories[optcategory]
+        elif optplayertype == "pitching":
+            if not optcategory:
+                irc.reply("Pitching Categories: %s" % pitchingcategories.keys())
+                return
+            else:
+                optcategory = optcategory.lower()
+
+                if optcategory not in pitchingcategories:
+                    irc.reply("Stat must be one of: %s" % pitchingcategories.keys())
+                    return
+                else:
+                    endurl = '%s_career.shtml' % pitchingcategories[optcategory]
+        else:
+            irc.reply("Must specify batting or pitching.")
+            return
+        
+        url = self._b64decode('aHR0cDovL3d3dy5iYXNlYmFsbC1yZWZlcmVuY2UuY29tL2xlYWRlcnMv') + endurl
+        self.log.info(url)
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failure to fetch: %s" % url)
+            return
+
+        html = html.replace('&nbsp;',' ')
+
+        soup = BeautifulSoup(html)
+        table = soup.find('table', attrs={'data-crop':'50'})
+        rows = table.findAll('tr')
+
+        self.log.info(str(len(rows)))
+
+        object_list = []
+
+        for row in rows[1:11]:
+            
+            rank = row.find('td', attrs={'align':'right'})
+            player = rank.findNext('td')
+            stat = player.findNext('td')
+            if player.find('strong'):
+                player = ircutils.underline(player.find('a').find('strong').renderContents().strip())
+            else:
+                player = player.find('a').renderContents()
+            d = collections.OrderedDict()
+            d['rank'] = rank.renderContents().strip()
+            d['player'] = player
+            d['stat'] = stat.renderContents().strip()
+            object_list.append(d)
+
+        output = "MLB Career Leaders for: " + optcategory + " (+ indicates HOF; "
+        output += ircutils.underline("UNDERLINE") + " indicates active.)"
+        irc.reply(output)
+
+        for N in self._batch(object_list, 5):
+            irc.reply(' '.join(str(str(n['rank']) + " " + ircutils.bold(n['player'])) + " (" + n['stat'] + ") " for n in N))
+
+    mlbcareerleaders = wrap(mlbcareerleaders, [('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
+                 
     # mlbscores. use gd2 (gameday) data.
     def mlbscores(self, irc, msg, args, optdate):
         """[date]
@@ -224,9 +323,8 @@ class MLB(callbacks.Plugin):
             d['status'] = str(each.get('@status', None))
             object_list.append(d)
 
-        for each in object_list:
-            irc.reply(each)
-    
+        #for each in object_list:
+         
     mlbscores = wrap(mlbscores, [optional('somethingWithoutSpaces')])
 
     def mlbawards(self, irc, msg, args, optyear):
