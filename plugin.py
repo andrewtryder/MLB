@@ -13,6 +13,7 @@ import datetime
 import string
 import sqlite3
 from itertools import izip, groupby, count
+import json
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -37,13 +38,39 @@ class MLB(callbacks.Plugin):
         except ValueError:
             return False
 
-    def _b64encode(self, string):
-        """Returns base64 encoded string."""
-        import base64
-        return base64.b64encode(string)
+    # smart_truncate from http://stackoverflow.com/questions/250357/smart-truncate-in-python
+    def _smart_truncate(self, text, length, suffix='...'):
+        """Truncates `text`, on a word boundary, as close to
+        the target length it can come.
+        """
+
+        slen = len(suffix)
+        pattern = r'^(.{0,%d}\S)\s+\S+' % (length-slen-1)
+        if len(text) > length:
+            match = re.match(pattern, text)
+            if match:
+                length0 = match.end(0)
+                length1 = match.end(1)
+                if abs(length0+slen-length) < abs(length1+slen-length):
+                    return match.group(0) + suffix
+                else:
+                    return match.group(1) + suffix
+        return text
+
+    def _shortenUrl(self, url):
+        posturi = "https://www.googleapis.com/urlshortener/v1/url"
+        headers = {'Content-Type' : 'application/json'}
+        data = {'longUrl' : url}
+
+        data = json.dumps(data)
+        request = urllib2.Request(posturi,data,headers)
+        response = urllib2.urlopen(request)
+        response_data = response.read()
+        shorturi = json.loads(response_data)['id']
+        return shorturi
 
     def _b64decode(self, string):
-        """Returns base64 encoded string."""
+        """Returns base64 decoded string."""
         import base64
         return base64.b64decode(string)
         
@@ -78,6 +105,52 @@ class MLB(callbacks.Plugin):
             
             return (str(row[0]))
 
+    def mlbteamnews(self, irc, msg, args, optteam):
+        """Display the most recent news and articles about a team."""
+
+        optteam = optteam.upper().strip()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+            
+        lookupteam = self._translateTeam('fanfeedr', 'team', optteam) # (db, column, optteam)
+
+        # need ff apikey.
+        apiKey = self.registryValue('ffApiKey')
+        if not apiKey or apiKey == "Not set":
+            irc.reply("API key not set. see 'config help supybot.plugins.MLB.ffApiKey'.")
+            return
+        
+        # construct url
+        url = 'http://ffapi.fanfeedr.com/basic/api/teams/%s/content' % lookupteam
+        url += '?api_key=%s' % apiKey #2p69aasw2g5s5a5d5dq5tfmu
+        
+        self.log.info(url)
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+        
+        try:
+            jsondata = json.loads(html)
+        except:
+            irc.reply("Could not parse json data")
+            return
+            
+        for each in jsondata[0:6]:
+            origin = each['origin']['name']
+            title = each['title']
+            linkurl = each['url']
+            output = "{0} - {1} {2}".format(ircutils.underline(origin), self._smart_truncate(title, 40),\
+                ircutils.mircColor(self._shortenUrl(linkurl), 'blue'))
+            irc.reply(output)
+
+    mlbteamnews = wrap(mlbteamnews, [('somethingWithoutSpaces')])
+
     def mlbteams(self, irc, msg, args):
         """Display a list of valid teams for input."""
         
@@ -101,7 +174,7 @@ class MLB(callbacks.Plugin):
     def mlbvaluations(self, irc, msg, args):
         """Display current MLB team valuations from Forbes."""
         
-        url = 'http://www.forbes.com/mlb-valuations/list/'
+        url = self._b64decode('aHR0cDovL3d3dy5mb3JiZXMuY29tL21sYi12YWx1YXRpb25zL2xpc3Qv')
 
         try:
             req = urllib2.Request(url)
@@ -137,7 +210,7 @@ class MLB(callbacks.Plugin):
         irc.reply(ircutils.mircColor("Current MLB Team Values", 'red') + " (in millions):")
         
         for N in self._batch(object_list, 7):
-            irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + ")" for n in N))        
+            irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + "M)" for n in N))        
             
     mlbvaluations = wrap(mlbvaluations)
 
@@ -227,7 +300,6 @@ class MLB(callbacks.Plugin):
             return
         
         url = self._b64decode('aHR0cDovL3d3dy5iYXNlYmFsbC1yZWZlcmVuY2UuY29tL2xlYWRlcnMv') + endurl
-        self.log.info(url)
 
         try:
             req = urllib2.Request(url)
@@ -241,8 +313,6 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'data-crop':'50'})
         rows = table.findAll('tr')
-
-        self.log.info(str(len(rows)))
 
         object_list = []
 
@@ -270,63 +340,6 @@ class MLB(callbacks.Plugin):
 
     mlbcareerleaders = wrap(mlbcareerleaders, [('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
                  
-    # mlbscores. use gd2 (gameday) data.
-    def mlbscores(self, irc, msg, args, optdate):
-        """[date]
-        Display current MLB scores.
-        """
-        
-        import xmltodict
-        
-        if optdate: 
-            testdate = self._validate(optdate, '%Y%m%d')
-            if not testdate:
-                irc.reply("Invalid year. Must be YYYYmmdd.")
-                return
-            else:
-                _year = optdate[0:4]
-                _month = optdate[4:6]
-                _day = optdate[6:8]
-        else:
-            (_month, _day, _year) = datetime.date.today().strftime("%m/%d/%Y").split('/')
-        
-        url = 'http://gd2.mlb.com/components/game/mlb/year_%s/month_%s/day_%s/miniscoreboard.xml' % (_year, _month, _day)
-        self.log.info(url)
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to fetch: %s" % url)
-            return
-
-        doc = xmltodict.parse(html)
-        games = doc['games']['game'] # always there.
-        
-        if len(games) < 1:
-            irc.reply("We failed to find any games for that day")
-            return
-
-        object_list = []
-
-        for each in games:
-            d = collections.OrderedDict()
-            d['outs'] = str(each.get('@outs', None))
-            d['top_inning'] = str(each.get('@top_inning', None))
-            d['inning'] = str(each.get('@inning', None))
-            d['awayteam'] = str(each.get('@away_name_abbrev', None))
-            d['hometeam'] = str(each.get('@home_name_abbrev', None))
-            d['awayruns'] = str(each.get('@away_team_runs', None))
-            d['homeruns'] = str(each.get('@home_team_runs', None))
-            d['time'] = str(each.get('@time', None))
-            d['ampm'] = str(each.get('@ampm', None))
-            d['status'] = str(each.get('@status', None))
-            object_list.append(d)
-
-        #for each in object_list:
-         
-    mlbscores = wrap(mlbscores, [optional('somethingWithoutSpaces')])
-
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
         Display various MLB awards for current (or previous) year. Use YYYY for year. Ex: 2011

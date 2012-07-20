@@ -23,5 +23,6 @@ def configure(advanced):
 MLB = conf.registerPlugin('MLB')
 # This is where your configuration variables (if any) should go.  For example:
 conf.registerGlobalValue(MLB, 'dbLocation', registry.String('/home/spline/supybot/plugins/MLB/mlb.db', _("""Absolute path for mlb.db sqlite3 database file location.""")))
+conf.registerGlobalValue(MLB, 'ffApiKey', registry.String('', """api key for fanfeedr.com""", private=True))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:
