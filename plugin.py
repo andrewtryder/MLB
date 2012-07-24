@@ -124,7 +124,7 @@ class MLB(callbacks.Plugin):
         
         # construct url
         url = 'http://ffapi.fanfeedr.com/basic/api/teams/%s/content' % lookupteam
-        url += '?api_key=%s' % apiKey #2p69aasw2g5s5a5d5dq5tfmu
+        url += '?api_key=%s' % apiKey #
         
         self.log.info(url)
 
@@ -170,6 +170,69 @@ class MLB(callbacks.Plugin):
         irc.reply("  '.____.'   ")
     
     baseball = wrap(baseball)
+
+    def mlbweather(self, irc, msg, args, optteam):
+        """[team]
+        Display weather for MLB team at park they are playing at.
+        """
+        
+        optteam = optteam.upper().strip()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+        
+        url = self._b64decode('aHR0cDovL3d3dy5wYXJrZmFjdG9ycy5jb20v')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL') # need some mangling.
+
+        soup = BeautifulSoup(html)
+        h3s = soup.findAll('h3')
+
+        object_list = []
+
+        for h3 in h3s:
+            park = h3.find('span', attrs={'style':'float: left;'})
+            factor = h3.find('span', attrs={'style': re.compile('color:.*?')})
+            matchup = h3.findNext('h4').find('span', attrs={'style':'float: left;'})
+            winddir = h3.findNext('img', attrs={'class':'rose'})
+            windspeed = h3.findNext('p', attrs={'class':'windspeed'}).find('span')
+            weather = h3.findNext('h5', attrs={'class':'l'})
+            if weather.find('img', attrs={'src':'../images/roof.gif'}):
+                weather = "[ROOF] " + weather.text 
+            else:
+                weather = weather.text.strip()
+
+            d = collections.OrderedDict()
+            d['park'] = park.renderContents().strip()
+            d['factor'] = factor.renderContents().strip()
+            d['matchup'] = matchup.renderContents().strip()
+            d['winddir'] = str(''.join(i for i in winddir['src'] if i.isdigit()))
+            d['windspeed'] = windspeed.renderContents().strip()
+            d['weather'] = weather.replace('.Later','. Later').replace('&deg;F','F ')
+            object_list.append(d)
+
+        output = False 
+        
+        for each in object_list:
+            if optteam in each['matchup']:
+                output = "{0} at {1}({2})  Weather: {3}  Wind: {4}mph ({5}deg)".format(ircutils.underline(each['matchup']),\
+                    each['park'], each['factor'], each['weather'], each['windspeed'], each['winddir'])
+        
+        if not output:
+            irc.reply("No match-up found for: %s" % optteam)
+            return
+        else:
+            irc.reply(output)
+            
+    mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
     
     def mlbvaluations(self, irc, msg, args):
         """Display current MLB team valuations from Forbes."""
