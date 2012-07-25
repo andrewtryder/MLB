@@ -102,6 +102,8 @@ class MLB(callbacks.Plugin):
         jsonurl += '&encoding=json'
         jsonurl += '&api_key=%s' % (apiKey)
 
+        self.log.info(jsonurl)
+
         try:
             request = urllib2.Request(jsonurl)
             response = urllib2.urlopen(request)
@@ -207,9 +209,15 @@ class MLB(callbacks.Plugin):
         response_data = self._salary(flags)
         jsondata = json.loads(response_data)
 
+        length = jsondata.get('salaries', None)[0]
+
+        if length is None:
+            irc.reply("No salary data found for: %s" % optplayer)
+            return
+
         seasons = jsondata['rootmetadata'][0]['seasons']
         currentSeason = jsondata['rootmetadata'][0]['currentSeason']
-        salaryAverage = jsondata['salaries'][0]['average']
+        salaryAverage = jsondata['salaries'][0]['average'] # here
         salaryMedian = jsondata['salaries'][0]['med']
         
         s = jsondata['salaries'][0]['salary']
