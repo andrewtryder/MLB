@@ -820,6 +820,8 @@ class MLB(callbacks.Plugin):
             return
                     
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xpbmV1cHM/d2piPQ==')
+
+        self.log.info(url)
         
         try:
             req = urllib2.Request(url)
@@ -829,10 +831,8 @@ class MLB(callbacks.Plugin):
             return
 
         # have to do some replacing for the regex to work
-        html = html.replace('<b  >', '<b>')
-        html = html.replace('<b>TAM</b>','<b>TB</b>')
-        html = html.replace('<b>WAS</b>','<b>WSH</b>')
-        html = html.replace('<b>CHW</b>','<b>CWS</b>')
+        html = html.replace('<b  >', '<b>').replace('<b>TAM</b>','<b>TB</b>').replace('<b>WAS</b>','<b>WSH</b>').replace('<b>CHW</b>','<b>CWS</b>')
+        html = html.replace('<b>KAN</b>','<b>KC</b>').replace('<b>SDG</b>','<b>SD</b>').replace('<b>SFO</b>','<b>SF</b>')
 
         outdict = {}
 
