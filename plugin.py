@@ -38,7 +38,7 @@ class MLB(callbacks.Plugin):
         except ValueError:
             return False
 
-    # smart_truncate from http://stackoverflow.com/questions/250357/smart-truncate-in-python
+
     def _smart_truncate(self, text, length, suffix='...'):
         """Truncates `text`, on a word boundary, as close to
         the target length it can come.
@@ -57,11 +57,12 @@ class MLB(callbacks.Plugin):
                     return match.group(1) + suffix
         return text
 
+
     def _shortenUrl(self, url):
+        """Returned goo.gl shortened URL."""
         posturi = "https://www.googleapis.com/urlshortener/v1/url"
         headers = {'Content-Type' : 'application/json'}
         data = {'longUrl' : url}
-
         data = json.dumps(data)
         request = urllib2.Request(posturi,data,headers)
         response = urllib2.urlopen(request)
@@ -69,16 +70,55 @@ class MLB(callbacks.Plugin):
         shorturi = json.loads(response_data)['id']
         return shorturi
 
+
     def _b64decode(self, string):
         """Returns base64 decoded string."""
         import base64
         return base64.b64decode(string)
         
-    # http://code.activestate.com/recipes/303279/#c7
+
     def _batch(self, iterable, size):
         c = count()
         for k, g in groupby(iterable, lambda x:c.next()//size):
             yield g
+
+    
+    def _millify(self, num):
+        for x in ['','k','M','B','T']:
+            if num < 1000.0:
+              return "%3.1f%s" % (num, x)
+            num /= 1000.0
+            
+
+    def _salary(self, flags):
+        """http://developer.usatoday.com/docs/read/salaries"""
+
+        apiKey = self.registryValue('usatApiKey')
+        if not apiKey or apiKey == "Not set":
+            self.log.info("API key not set. see 'config help plugins.MLB.USATapiKey'.")
+            return
+
+        jsonurl = 'http://api.usatoday.com/open/salaries/mlb?%s' % (flags)
+        jsonurl += '&encoding=json'
+        jsonurl += '&api_key=%s' % (apiKey)
+
+        try:
+            request = urllib2.Request(jsonurl)
+            response = urllib2.urlopen(request)
+            response_data = response.read()
+        except urllib2.HTTPError as err:
+            if err.code == 404:
+                irc.reply("Error 404")
+                self.log.warning("Error 404 on: %s" % (jsonurl))
+            elif err.code == 403:
+                irc.reply("Error 403. Try waiting 60 minutes.")
+                self.log.warning("Error 403 on: %s" %s (jsonurl))
+            else:
+                irc.reply("Error. Check the logs.")
+            return
+
+        return response_data
+        
 
     def _validteams(self):
         """Returns a list of valid teams for input verification."""
@@ -93,6 +133,7 @@ class MLB(callbacks.Plugin):
 
         return teamlist
     
+    
     def _translateTeam(self, db, column, optteam):
         """Translates optteam into proper string using database"""
         db_filename = self.registryValue('dbLocation')
@@ -105,8 +146,86 @@ class MLB(callbacks.Plugin):
             
             return (str(row[0]))
 
+
+    def mlbteamsalary(self, irc, msg, args, optteam):
+        """[team]
+        Display top 5 salaries for teams. Ex: Yankees
+        """
+        
+        optteam = optteam.upper().strip()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+            
+        lookupteam = self._translateTeam('short', 'team', optteam) # (db, column, optteam)
+
+        flags = 'seasons=%s&teams=%s' % (datetime.datetime.now().year, lookupteam)
+
+        response_data = self._salary(flags)        
+        jsondata = json.loads(response_data)
+
+        if len(jsondata['salaries']) < 1:
+            irc.reply("I did not find any team salary data in %s for %s" % (sportname, team))
+            return
+
+        salaryAverage = str(jsondata['salaries'][0]['average']).replace(",","")
+        salaryMed = str(jsondata['salaries'][0]['med']).replace(",","")
+        salaryStdev = str(jsondata['salaries'][0]['stdev']).replace(",","")
+        salaryTotal = str(jsondata['salaries'][0]['total']).replace(",","")
+
+        s = jsondata['salaries'][0]['salary']
+        ln = lambda x: int(x.get('salary').replace(",",""))
+        esorted = sorted(s, key=ln,reverse=True)
+
+        output = ircutils.bold(ircutils.underline(optteam))
+        output += " " + "Average: " + self._millify(int(salaryAverage))
+        output += " " + "Median: " + self._millify(int(salaryMed))
+        output += " " + "Total: " + self._millify(int(salaryTotal))
+
+        salString = ircutils.bold(ircutils.underline(optteam)) + " (top 5 salary): "
+
+        for i,entry in enumerate(esorted):
+            if i < 6:
+                salaryEntry = self._millify(int(entry['salary'].replace(",","")))
+                salString += salaryEntry + " " + entry['player_full_name'] + "(" + entry['position'] + ") " 
+
+        irc.reply(output)
+        irc.reply(salString)
+
+    mlbteamsalary = wrap(mlbteamsalary, [('text')])
+    
+    # top5 paid players: http://api.usatoday.com/open/salaries/mlb?players=&top=5&seasons=2012
+    
+    def mlbsalary(self, irc, msg, args, optplayer):
+        """[player]
+        Get the last 4 years of salary for player name. Ex: Derek Jeter
+        """
+        
+        flags='players=%s' % (optplayer.replace(" ","-").strip())
+
+        response_data = self._salary(flags)
+        jsondata = json.loads(response_data)
+
+        seasons = jsondata['rootmetadata'][0]['seasons']
+        currentSeason = jsondata['rootmetadata'][0]['currentSeason']
+        salaryAverage = jsondata['salaries'][0]['average']
+        salaryMedian = jsondata['salaries'][0]['med']
+        
+        s = jsondata['salaries'][0]['salary']
+        ln = lambda x: x.get('season')
+        esorted = sorted(s, key=ln,reverse=True)
+
+        salString = string.join([i['season']+": "+ self._millify(int(i['salary'].replace(",",""))) for i in esorted], " | ")
+        irc.reply(ircutils.bold(optplayer.title()) + ": " + salString)
+
+    mlbsalary = wrap(mlbsalary, [('text')])
+
+        
     def mlbteamnews(self, irc, msg, args, optteam):
-        """Display the most recent news and articles about a team."""
+        """[team]
+        Display the most recent news and articles about a team. Ex: NYY
+        """
 
         optteam = optteam.upper().strip()
 
@@ -116,13 +235,11 @@ class MLB(callbacks.Plugin):
             
         lookupteam = self._translateTeam('fanfeedr', 'team', optteam) # (db, column, optteam)
 
-        # need ff apikey.
         apiKey = self.registryValue('ffApiKey')
         if not apiKey or apiKey == "Not set":
             irc.reply("API key not set. see 'config help supybot.plugins.MLB.ffApiKey'.")
             return
         
-        # construct url
         url = 'http://ffapi.fanfeedr.com/basic/api/teams/%s/content' % lookupteam
         url += '?api_key=%s' % apiKey #
         
@@ -170,6 +287,7 @@ class MLB(callbacks.Plugin):
         irc.reply("  '.____.'   ")
     
     baseball = wrap(baseball)
+    
 
     def mlbweather(self, irc, msg, args, optteam):
         """[team]
@@ -234,6 +352,7 @@ class MLB(callbacks.Plugin):
             
     mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
     
+    
     def mlbvaluations(self, irc, msg, args):
         """Display current MLB team valuations from Forbes."""
         
@@ -276,6 +395,7 @@ class MLB(callbacks.Plugin):
             irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + "M)" for n in N))        
             
     mlbvaluations = wrap(mlbvaluations)
+
 
     def mlbplayoffs(self, irc, msg, args):
         """Display playoff matchups if season ended today."""
@@ -402,6 +522,7 @@ class MLB(callbacks.Plugin):
             irc.reply(' '.join(str(str(n['rank']) + " " + ircutils.bold(n['player'])) + " (" + n['stat'] + ") " for n in N))
 
     mlbcareerleaders = wrap(mlbcareerleaders, [('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
+
                  
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
@@ -449,6 +570,7 @@ class MLB(callbacks.Plugin):
         irc.reply(output)
 
     mlbawards = wrap(mlbawards, [optional('somethingWithoutSpaces')])
+
     
     def mlbschedule(self, irc, msg, args, optteam):
         """[team]
@@ -505,6 +627,7 @@ class MLB(callbacks.Plugin):
 
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
 
+
     def mlbmanager(self, irc, msg, args, optteam):
         """[team]
         Display the manager for team.
@@ -553,6 +676,7 @@ class MLB(callbacks.Plugin):
                 irc.reply(output)
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
+
 
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """<--expanded|--vsdivision> [ALE|ALC|ALW|NLC|NLC|NLW]
@@ -682,6 +806,7 @@ class MLB(callbacks.Plugin):
                 irc.reply(output)
 
     mlbstandings = wrap(mlbstandings, [getopts({'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
+
     
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
@@ -726,6 +851,7 @@ class MLB(callbacks.Plugin):
             return
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
+
     
     def mlbinjury(self, irc, msg, args, optlist, optteam):
         """<--details> [TEAM]
@@ -794,6 +920,7 @@ class MLB(callbacks.Plugin):
 
     mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
 
+
     def mlbpowerrankings(self, irc, msg, args):
         """
         Display this week's MLB Power Rankings.
@@ -841,6 +968,7 @@ class MLB(callbacks.Plugin):
             irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['lastweek'] + ")" for n in N))
         
     mlbpowerrankings = wrap(mlbpowerrankings)
+
 
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """[TEAM] [category]
@@ -898,6 +1026,7 @@ class MLB(callbacks.Plugin):
 
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
+
     def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
         """[MLB|AL|NL] [category] 
         Display leaders (top 5) in category for teams in the MLB.
@@ -947,6 +1076,7 @@ class MLB(callbacks.Plugin):
 
     mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
+
     def mlbrumors(self, irc, msg, args):
         """
         Display the latest mlb rumors.
@@ -976,6 +1106,7 @@ class MLB(callbacks.Plugin):
             irc.reply(ircutils.bold(item) + " :: " + rumor)
 
     mlbrumors = wrap(mlbrumors)
+
 
     def mlbteamtrans(self, irc, msg, args, optteam):
         """[team]
@@ -1015,6 +1146,7 @@ class MLB(callbacks.Plugin):
                 irc.reply("{0:8} {1}".format(ircutils.bold(str(trans[0])), str(trans[1])))
 
     mlbteamtrans = wrap(mlbteamtrans, [('somethingWithoutSpaces')])
+
 
     def mlbtrans(self, irc, msg, args, optdate):
         """[YYYYmmDD]
@@ -1070,6 +1202,7 @@ class MLB(callbacks.Plugin):
             return
     
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
+
 
     def mlbprob(self, irc, msg, args, optteam):
         """[YYYYMMDD] <TEAM>
