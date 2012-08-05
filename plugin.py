@@ -855,7 +855,7 @@ class MLB(callbacks.Plugin):
             output = "{0:5} - {1:150}".format(ircutils.bold(optteam), lineup)
             irc.reply(output)
         else:
-            irc.reply("Could not find lineup. Check closer to game time.")
+            irc.reply("Could not find lineup for: %s. Check closer to game time." % optteam)
             return
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
