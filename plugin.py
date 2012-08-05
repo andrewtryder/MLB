@@ -228,6 +228,52 @@ class MLB(callbacks.Plugin):
         irc.reply(ircutils.bold(optplayer.title()) + ": " + salString)
 
     mlbsalary = wrap(mlbsalary, [('text')])
+    
+    
+    def mlbwar(self, irc, msg, args, opttype):
+        """[overall|pitching|offense|fielding]
+        Display MLB leaders in WAR for various categories.
+        """
+        
+        opttype = opttype.lower()
+        
+        wartypelist = ['overall','pitching','offense','fielding']
+        
+        if opttype not in wartypelist:
+            irc.reply("WAR type must be one of: %s" % wartypelist)
+            return
+            
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi8=')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except: 
+            irc.reply("Failed to open: %s" % url)
+            return
+                
+        soup = BeautifulSoup(html)
+        regexString = 'war' + opttype + '.*?' # build regex ourselves for searching.
+        div = soup.find('div', attrs={'id':re.compile(regexString)})
+
+        table = div.find('table')
+        rows = table.findAll('tr')[1:] # skip header.
+
+        append_list = []
+
+        for row in rows:
+            rank = row.find('td')
+            player = rank.findNext('td')
+            team = player.findNext('td')
+            war = team.findNext('td')
+            append_list.append(ircutils.bold(player.getText()) + " (" + team.getText() + ") " + war.getText())
+
+        descstring = string.join([item for item in append_list], " | ")
+        output = "{0} {1} :: {2}".format(ircutils.mircColor("WAR Leaders for:", 'red'), ircutils.underline(opttype.title()), descstring)
+        
+        irc.reply(output)
+    
+    mlbwar = wrap(mlbwar, [('somethingWithoutSpaces')])
 
         
     def mlbteamnews(self, irc, msg, args, optteam):
