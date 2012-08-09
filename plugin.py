@@ -230,6 +230,61 @@ class MLB(callbacks.Plugin):
     mlbsalary = wrap(mlbsalary, [('text')])
     
     
+    def mlbffplayerratings(self, irc, msg, args, optposition):
+        """<position>
+        Display MLB player ratings per position. Positions must be one of:
+        Batters | Pitchers | C | 1B | 2B | 3B | SS | 2B/SS | 1B/3B | OF | SP | RP
+        """
+                
+        validpositions = { 'Batters':'?&slotCategoryGroup=1','Pitchers':'?&slotCategoryGroup=2', 'C':'?&slotCategoryId=0', '1B':'?&slotCategoryId=1', 
+            '2B':'?&slotCategoryId=2', '3B':'?&slotCategoryId=3', 'SS':'?&slotCategoryId=4', '2B/SS':'?&slotCategoryId=6', '1B/3B':'?&slotCategoryId=7',
+            'OF':'?&slotCategoryId=5', 'SP':'?&slotCategoryId=14', 'RP':'?&slotCategoryId=15' }
+        
+        if optposition and optposition not in validpositions:
+            irc.reply("Invalid position. Must be one of: %s" % validpositions.keys())
+            return
+            
+        url = self._b64decode('aHR0cDovL2dhbWVzLmVzcG4uZ28uY29tL2ZsYi9wbGF5ZXJyYXRlcg==')
+
+        if optposition:
+            url += '%s' % validpositions[optposition]
+        
+        self.log.info(url)
+        
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('&nbsp;',' ')
+    
+        soup = BeautifulSoup(html)
+        table = soup.find('table', attrs={'id':'playertable_0'})
+        rows = table.findAll('tr')[2:12]
+
+        append_list = []
+
+        for row in rows:
+            rank = row.find('td')
+            player = row.find('td', attrs={'class':'playertablePlayerName'}).find('a')
+            rating = row.find('td', attrs={'class':'playertableData sortedCell'})
+            append_list.append(rank.getText() + ". " + ircutils.bold(player.getText()) + " (" + rating.getText() + ")")
+    
+        descstring = string.join([item for item in append_list], " | ") 
+
+        if optposition:
+            title = "Top 10 FF projections at: %s" % optposition
+        else:
+            title = "Top 10 FF projections"
+            
+        output = "{0} :: {1}".format(ircutils.mircColor(title, 'red'), descstring)
+        irc.reply(output)
+        
+    mlbffplayerratings = wrap(mlbffplayerratings, [optional('somethingWithoutSpaces')])
+    
+    
     def mlbwar(self, irc, msg, args, opttype):
         """[overall|pitching|offense|fielding]
         Display MLB leaders in WAR for various categories.
