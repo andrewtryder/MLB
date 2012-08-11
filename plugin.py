@@ -417,6 +417,10 @@ class MLB(callbacks.Plugin):
         except:
             irc.reply("Failed to open: %s" % url)
             return
+        
+        if "an error occurred while processing this directive" in html:
+            irc.reply("Something broke with parkfactors. Check back later.")
+            return
             
         html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL') # need some mangling.
 
@@ -504,6 +508,42 @@ class MLB(callbacks.Plugin):
             irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + "M)" for n in N))        
             
     mlbvaluations = wrap(mlbvaluations)
+    
+    
+    def mlbremaining(self, irc, msg, args, optteam):
+        """[team]
+        Display remaining games/schedule for a playoff contender.
+        """
+        
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
+        
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        tables = soup.findAll('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1', 'width':'100%'})
+
+        new_data = collections.defaultdict(list)
+
+        for table in tables:
+            team = table.find('tr', attrs={'class':'colhead'}).find('td', attrs={'colspan':'6'})
+            gr = table.find('tr', attrs={'class':'oddrow'})
+            if team is not None and gr is not None: # horrible and cheap parse
+                team = self._translateTeam('team', 'fulltrans', team.getText().title()) # full to short.
+                new_data[str(team)].append(gr.getText())
+        
+        output = new_data.get(optteam, None)
+
+        if output is None:
+            irc.reply("%s not listed. Not considered a playoff contender." % optteam)
+        else:
+            irc.reply(ircutils.bold(optteam) + " :: " + (" ".join(output)))
+            
+    mlbremaining = wrap(mlbremaining, [('somethingWithoutSpaces')])
 
 
     def mlbplayoffs(self, irc, msg, args):
@@ -517,6 +557,8 @@ class MLB(callbacks.Plugin):
         except:
             irc.reply('Failed to fetch: %s' % (self._b64decode('url')))
             return
+        
+        html = html.replace('sdg', 'sd').replace('sfo', 'sf').replace('tam', 'tb').replace('was', 'wsh').replace('kan', 'kc').replace('chw', 'cws')
         
         soup = BeautifulSoup(html)
         each = soup.findAll('td', attrs={'width':'25%'})
