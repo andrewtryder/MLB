@@ -153,6 +153,51 @@ class MLB(callbacks.Plugin):
     # Public Functions.
     ###################################
     
+    def mlbgamesbypos (self, irc, msg, args, optteam):
+        """[team]
+        Display a team's games by position. Ex: NYY
+        """
+
+        optteam = optteam.upper()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+
+        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stop-gap. 
+            optteam = 'chw'
+        else:
+            optteam = optteam.lower()
+            
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL2xpbmV1cC9fL25hbWU=') + '/%s/' % optteam
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+
+        table = soup.find('td', attrs={'colspan':'2'}, text="GAMES BY POSITION").findParent('table')
+        rows = table.findAll('tr', attrs={'class':re.compile('oddrow|evenrow')})
+
+        append_list = []
+
+        for row in rows:
+            playerPos = row.find('td').find('strong')
+            playersList = playerPos.findNext('td')
+            append_list.append(str(ircutils.bold(playerPos.getText()) + " " + playersList.getText()))
+
+        descstring = string.join([item for item in append_list], " | ") 
+        output = "{0} :: {1}".format(ircutils.underline(optteam.upper()), descstring)
+        
+        irc.reply(output)
+
+    mlbgamesbypos = wrap(mlbgamesbypos, [('somethingWithoutSpaces')])
+    
+    
     def mlbroster(self, irc, msg, args, optlist, optteam):
         """<--40man|--active> [team]
         Display active roster for team. Defaults to active roster but use --40man switch to 
@@ -172,7 +217,7 @@ class MLB(callbacks.Plugin):
             if option == '40man':
                 active, fortyman = False, True
 
-        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stopgap. 
+        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stop-gap. 
             optteam = 'chw'
         else:
             optteam = optteam.lower()
