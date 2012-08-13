@@ -142,11 +142,148 @@ class MLB(callbacks.Plugin):
         with sqlite3.connect(db_filename) as conn:
             cursor = conn.cursor()
             query = "select %s from mlb where %s='%s'" % (db, column, optteam)
-            self.log.info(query)
+            #self.log.info(query)
             cursor.execute(query)
             row = cursor.fetchone()
             
             return (str(row[0]))
+    
+    
+    ###################################
+    # Public Functions.
+    ###################################
+    
+    def mlbroster(self, irc, msg, args, optlist, optteam):
+        """<--40man|--active> [team]
+        Display active roster for team. Defaults to active roster but use --40man switch to 
+        show the entire roster. Ex: --40man NYY
+        """
+
+        optteam = optteam.upper()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+               
+        active, fortyman = True, False
+        for (option, arg) in optlist:
+            if option == 'active':
+                active, fortyman = True, False
+            if option == '40man':
+                active, fortyman = False, True
+
+        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stopgap. 
+            optteam = 'chw'
+        else:
+            optteam = optteam.lower()
+            
+        if active and not fortyman:        
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3Jvc3Rlci9fL25hbWU=') + '/%s/type/active/' % optteam
+        else: # 40man
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3Jvc3Rlci9fL25hbWU=') + '/%s/' % optteam
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('class="evenrow','class="oddrow')
+
+        soup = BeautifulSoup(html)
+        table = soup.find('div', attrs={'class':'mod-content'}).find('table', attrs={'class':'tablehead'})
+        rows = table.findAll('tr', attrs={'class':re.compile('oddrow player.*?')})
+
+        team_data = collections.defaultdict(list)
+        
+        for row in rows:
+            playerType = row.findPrevious('tr', attrs={'class':'stathead'})     
+            playerNum = row.find('td')
+            playerName = playerNum.findNext('td').find('a')
+            playerPos = playerName.findNext('td')
+            team_data[str(playerType.getText())].append(str(playerName.getText() + " (" + playerPos.getText() + ")"))
+
+        for i,j in team_data.iteritems():
+            output = "{0} {1} :: {2}".format(ircutils.underline(optteam.upper()), ircutils.bold(i), string.join([item for item in j], " | "))
+            irc.reply(output)
+    
+    mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
+    
+    
+    def mlbrosterstats(self, irc, msg, args, optteam):
+        """<team>
+        Displays top 5 youngest/oldest teams. Optionally, use TEAM as argument to display
+        roster stats/averages for MLB team. Ex: NYY
+        """
+
+        if optteam:
+            optteam = optteam.upper()
+            if optteam not in self._validteams():
+                irc.reply("Team not found. Must be one of: %s" % self._validteams())
+                return
+        
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9yb3N0ZXJz')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        table = soup.find('table', attrs={'class':'tablehead'})
+        rows = table.findAll('tr')[2:]
+
+        object_list = []
+
+        for row in rows:
+            rank = row.find('td')
+            team = rank.findNext('td')
+            rhb = team.findNext('td')
+            lhb = rhb.findNext('td')
+            sh = lhb.findNext('td')
+            rhp = sh.findNext('td')
+            lhp = rhp.findNext('td')
+            ht = lhp.findNext('td')
+            wt = ht.findNext('td')
+            age = wt.findNext('td')
+            young = age.findNext('td')
+            old = young.findNext('td')
+            
+            aString = str("RHB: " + rhb.getText() + "  LHB: " + lhb.getText() + "  SH: " + sh.getText() + "  RHP: " + rhp.getText() + "  LHP: " + lhp.getText()\
+                + "  AVG HT: " + ht.getText() + "  AVG WEIGHT: " + wt.getText() + "  AVG AGE: " + age.getText() + "  YOUNGEST: " + young.getText() + "  OLDEST: " + old.getText())
+            
+            d = collections.OrderedDict()
+            d['team'] = str(self._translateTeam('team', 'ename', team.getText()))
+            d['data'] = str(aString)
+            object_list.append(d)
+        
+        if optteam:
+            for each in object_list:
+                if each['team'] == optteam: # list will have all teams so we don't need to check
+                    output = "{0} Roster Stats :: {1}".format(ircutils.bold(each['team']), each['data'])
+            
+            irc.reply(output)
+            
+        else:
+            
+            youngest_list = []
+            oldest_list = []
+            
+            for each in object_list[0:5]:
+                youngest_list.append(each['team'])
+            for each in object_list[-6:-1]:
+                oldest_list.append(each['team'])
+            
+            output = "{0} :: {1}".format(ircutils.bold("5 Youngest MLB Teams:"), string.join([item for item in youngest_list], " | "))
+            irc.reply(output)
+            
+            output = "{0} :: {1}".format(ircutils.bold("5 Oldest MLB Teams:"), string.join([item for item in oldest_list], " | "))
+            irc.reply(output)           
+    
+    mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
 
 
     def mlbteamsalary(self, irc, msg, args, optteam):
