@@ -696,6 +696,12 @@ class MLB(callbacks.Plugin):
         """[team]
         Display remaining games/schedule for a playoff contender.
         """
+
+        optteam = optteam.upper()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
         
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
         
