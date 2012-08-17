@@ -275,7 +275,7 @@ class MLB(callbacks.Plugin):
                 irc.reply("No stats found for %s in %s" % (optplayer, optyear))
             else:
                 outyear = string.join([item for item in outyear], " | ")
-                irc.reply(outyear)               
+                irc.reply("{0} :: {1}".format(optplayer,outyear))               
         else:
             endrows = table.findAll('tr', attrs={'class':re.compile('^evenrow bi$|^oddrow bi$')})
     
