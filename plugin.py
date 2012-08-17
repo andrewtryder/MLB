@@ -10,6 +10,7 @@ import urllib2
 import re
 import collections
 import datetime
+import time
 import string
 import sqlite3
 from itertools import izip, groupby, count
@@ -76,7 +77,12 @@ class MLB(callbacks.Plugin):
         import base64
         return base64.b64decode(string)
         
-
+        
+    def _dateFmt(self, string):
+        """Return a short date string from a full date string."""
+        return time.strftime('%m/%d', time.strptime(string, '%B %d, %Y'))
+        
+        
     def _batch(self, iterable, size):
         c = count()
         for k, g in groupby(iterable, lambda x:c.next()//size):
@@ -152,6 +158,50 @@ class MLB(callbacks.Plugin):
     ###################################
     # Public Functions.
     ###################################
+    
+    def mlbejections(self, irc, msg, args):
+        """Display the total number of ejections and five most recent
+        for the MLB season.
+        """
+        
+        url = self._b64decode('aHR0cDovL3BvcnRhbC5jbG9zZWNhbGxzcG9ydHMuY29tL21sYi1lamVjdGlvbi1saXN0')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        ejectedTotal = soup.find('div', attrs={'class':'sites-list-showing-items'}).find('span')
+        table = soup.find('table', attrs={'id':'goog-ws-list-table', 'class':'sites-table goog-ws-list-table'})
+        rows = table.findAll('tr')[1:6] # last 5. header row is 0.
+
+        append_list = []
+
+        for row in rows:
+            date = row.find('td')
+            number = date.findNext('td')
+            pnum = number.findNext('td')
+            mnum = pnum.findNext('td')
+            unum = mnum.findNext('td')
+            umppos = unum.findNext('td')
+            umpname = umppos.findNext('td')
+            ejteam = umpname.findNext('td')
+            ejpos = ejteam.findNext('td')
+            ejected = ejpos.findNext('td')
+            date = str(self._dateFmt(date.getText()))
+    
+            append_list.append(date + " - " + str(umpname.getText()) + " ejected " + str(ejected.getText()) + "(" + str(ejpos.getText()) + ")")
+        
+        descstring = string.join([item for item in append_list], " | ")         
+        output = "There have been %s ejections this season. Last five:" % (ircutils.underline(ejectedTotal.getText()))    
+    
+        irc.reply("{0} {1}".format(output, descstring))
+    
+    mlbejections = wrap(mlbejections)    
+    
     
     def mlbstats(self, irc, msg, args, optlist, optplayer):
         """<--year YYYY> [player name]
