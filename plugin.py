@@ -153,6 +153,99 @@ class MLB(callbacks.Plugin):
     # Public Functions.
     ###################################
     
+    def mlbstats(self, irc, msg, args, optlist, optplayer):
+        """<--year YYYY> [player name]
+        Display career totals and season averages for player. If --year YYYY is
+        specified, it will display the season stats for that player, if available.
+        NOTE: This command is intended for retired/inactive players, not active ones.
+        """
+
+        (first, last) = optplayer.split(" ", 1) #playername needs to be "first-last"
+        searchplayer = first + '-' + last
+
+        optyear = False
+        for (option, arg) in optlist:
+            if option == 'year':
+                optyear = arg
+        
+        url = self._b64decode('aHR0cDovL3NlYXJjaC5lc3BuLmdvLmNvbS8=') + '%s' % searchplayer
+        
+        #self.log.info(url)
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        
+        if not soup.find('li', attrs={'class':'result mod-smart-card'}):
+            irc.reply("I didn't find a link for: %s. Perhaps you should be more specific and give a full playername" % optplayer)
+            return
+        else:        
+            playercard = soup.find('li', attrs={'class':'result mod-smart-card'})
+        
+        if 'http://espn.go.com/mlb/players/stats?playerId=' not in playercard.renderContents():
+            irc.reply("Could not find a link to career stats for: %s" % optplayer)
+            return
+        else:
+            #if playercard.find('a', attrs={'href':re.compile('.*?espn.go.com/mlb/players/stats.*?')}):
+            link = playercard.find('a', attrs={'href':re.compile('.*?espn.go.com/mlb/players/stats.*?')})['href']
+        
+        if not link:
+            irc.reply("I didn't find the link I needed for career stats. Did something break?")
+            return
+        else:
+            try:
+                req = urllib2.Request(link)
+                html = (urllib2.urlopen(req)).read()
+            except:
+                irc.reply("Failed to open: %s" % link)
+                return
+                
+        soup = BeautifulSoup(html)
+        playerName = soup.find('title')
+        table = soup.find('table', attrs={'class':'tablehead'}) # everything stems from the table.
+        header = table.find('tr', attrs={'class':'colhead'}).findAll('td') # columns to reference.
+
+        if optyear:
+            seasonrows = table.findAll('tr', attrs={'class':re.compile('^oddrow$|^evenrow$')}) # find all outside the season+totals
+            season_data = collections.defaultdict(list) # key will be the year.
+    
+            for row in seasonrows: 
+                tds = row.findAll('td')
+                for i,td in enumerate(tds):
+                    season_data[str(tds[0].getText())].append(str(ircutils.bold(header[i].getText()) + ": " + td.getText()))
+            
+            outyear = season_data.get(str(optyear), None)
+            
+            if not outyear:
+                irc.reply("No stats found for %s in %s" % (optplayer, optyear))
+            else:
+                outyear = string.join([item for item in outyear], " | ")
+                irc.reply(outyear)               
+        else:
+            endrows = table.findAll('tr', attrs={'class':re.compile('^evenrow bi$|^oddrow bi$')})
+    
+            for total in endrows:
+                if total.find('td', text="Total"):
+                    totals = total.findAll('td')
+                if total.find('td', text="Season Averages"):
+                    seasonaverages = total.findAll('td')
+    
+            del seasonaverages[0] #remove the first td, but match up header via j+2
+            del totals[0:2]
+
+            seasonstring = string.join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(seasonaverages)], " | ")
+            totalstring = string.join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(totals)], " | ")
+            
+            irc.reply("{0} Season Averages :: {1}".format(ircutils.bold(optplayer), seasonstring))
+            irc.reply("{0} Career Totals :: {1}".format(ircutils.bold(optplayer), totalstring))
+    
+    mlbstats = wrap(mlbstats, [(getopts({'year':('int')})), ('text')])
+    
     def mlbgamesbypos (self, irc, msg, args, optteam):
         """[team]
         Display a team's games by position. Ex: NYY
