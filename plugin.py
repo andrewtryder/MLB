@@ -168,6 +168,66 @@ class MLB(callbacks.Plugin):
     # Public Functions.
     ###################################
     
+    
+    def mlbseries(self, irc, msg, args, optteam, optopp):
+        """[team] [opp]
+        Display the remaining games between TEAM and OPP in the current schedule. Ex: NYY TOR
+        """
+        
+        optteam,optopp = optteam.upper(),optopp.upper()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+        
+        if optopp not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+
+        currentYear = str(datetime.date.today().year) # need as a str.
+        
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtcy9wcmludFNjaGVkdWxlL18vdGVhbQ==') + '/%s/season/%s' % (optteam, currentYear)
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html) # the html here is junk/garbage. soup cleans this up, even if using a regex. 
+
+        append_list, out_list = [], []
+
+        schedRegex = '<tr><td><font class="verdana" size="1"><b>(.*?)</b></font></td><td><font class="verdana" size="1">(.*?)</font></td>.*?<td align="right"><font class="verdana" size="1">(.*?)</font></td></tr>'
+        
+        patt = re.compile(schedRegex, re.I|re.S|re.M) # ugh, regex was the only way due to how horrible the printSchedule is. 
+
+        for m in patt.finditer(str(soup)):
+            mDate, mOpp, mTime = m.groups()
+            mDate = mDate.replace('.','').replace('Sept','Sep') # replace the at and Sept has to be fixed for %b
+            if "at " in mOpp: # clean-up the opp and shorten. 
+                mOpp = self._translateTeam('team', 'ename', mOpp.replace('at ','').strip())
+                mOpp = "@" + mOpp
+            else:
+                mOpp = self._translateTeam('team', 'ename', mOpp.strip())
+            if datetime.datetime.strptime(mDate + " " + currentYear, '%b %d %Y').date() >= datetime.date.today(): # only show what's after today
+                append_list.append(mDate + " - " + ircutils.bold(mOpp) + " " + mTime)
+
+        for each in append_list: # here, we go through all remaining games, only pick the ones with the opp in it, and go from there.
+            if optopp in each: # this is real cheap using string matching instead of assigning keys, but easier. 
+                out_list.append(each)
+
+        if len(out_list) > 0:
+            descstring = string.join([item for item in out_list], " | ")
+            output = "There are {0} games between {1} and {2} :: {3}".format(ircutils.mircColor(len(out_list), 'red'), ircutils.bold(optteam), ircutils.bold(optopp), descstring)
+            irc.reply(output)
+        else:
+            irc.reply("I do not see any remaining games between: {0} and {1} in the {2} schedule.".format(ircutils.bold(optteam), ircutils.bold(optopp), currentYear))
+        
+    mlbseries = wrap(mlbseries, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    
+    
     def mlbejections(self, irc, msg, args):
         """Display the total number of ejections and five most recent
         for the MLB season.
