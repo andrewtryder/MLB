@@ -1743,9 +1743,8 @@ class MLB(callbacks.Plugin):
 
 
     def mlbprob(self, irc, msg, args, optteam):
-        """[YYYYMMDD] <TEAM>
-        Display the MLB probables for date. Defaults to today. To search
-        for a specific team, use their abbr. like NYY
+        """<TEAM>
+        Display the MLB probables for a team over the next 5 stars. Ex: NYY
         """
 
         # without optdate and optteam, we only do a single day (today)
@@ -1779,7 +1778,6 @@ class MLB(callbacks.Plugin):
             if "No Games Scheduled" in html:
                 next
 
-            # fix some teams here. stupid espn.
             html = html.replace('WAS','WSH').replace('CHW','CWS').replace('KAN','KC').replace('TAM','TB').replace('SFO','SF').replace('SDG','SD')
     
             soup = BeautifulSoup(html)
@@ -1804,10 +1802,10 @@ class MLB(callbacks.Plugin):
         for eachentry in out_array:
             if optteam:
                 if optteam in eachentry['matchup']:
-                    irc.reply("{0:25} {1:4} {2:15} {3:12} {4:4} {5:15} {6:12} {7:10}".format(eachentry['matchup'], eachentry['vteam'], \
-                        eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats'], eachentry['date']))
+                    irc.reply("{0:10} {1:25} {2:4} {3:15} {4:15} {5:4} {6:15} {7:15}".format(eachentry['date'], eachentry['matchup'], eachentry['vteam'], \
+                        eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats']))
 
-    mlbprob = wrap(mlbprob, [optional('somethingWithoutSpaces')])
+    mlbprob = wrap(mlbprob, [('somethingWithoutSpaces')])
 
 Class = MLB
 
