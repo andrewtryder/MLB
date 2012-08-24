@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ##
 # Copyright (c) 2012, spline
 # All rights reserved.
@@ -76,7 +77,15 @@ class MLB(callbacks.Plugin):
         """Returns base64 decoded string."""
         import base64
         return base64.b64decode(string)
-        
+
+    def _daysSince(self, string):
+        a = datetime.date.today()
+        b = datetime.datetime.strptime(string, "%B %d, %Y")
+        b = b.date()
+        delta = b - a
+        delta = abs(delta.days)
+        return delta
+
         
     def _dateFmt(self, string):
         """Return a short date string from a full date string."""
@@ -200,7 +209,54 @@ class MLB(callbacks.Plugin):
     
         irc.reply("{0} {1}".format(output, descstring))
     
-    mlbejections = wrap(mlbejections)    
+    mlbejections = wrap(mlbejections)
+    
+
+    def mlbarrests(self, irc, msg, args):
+        """
+        Display the last 5 MLB arrests.
+        """    
+    
+        url = self._b64decode('aHR0cDovL2FycmVzdG5hdGlvbi5jb20vY2F0ZWdvcnkvcHJvLWJhc2ViYWxsLw==')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('&nbsp;',' ').replace('&#8217;','’')
+
+        soup = BeautifulSoup(html)
+        lastDate = soup.findAll('span', attrs={'class':'time'})[0] 
+        divs = soup.findAll('div', attrs={'class':'entry'})
+
+        append_list = []
+
+        for div in divs:
+            title = div.find('h2')
+            datet = div.find('span', attrs={'class':'time'})
+            datet = self._dateFmt(str(datet.getText()))
+            arrestedFor = div.find('strong', text=re.compile('Team:'))    
+            if arrestedFor:
+                matches = re.search(r'<strong>Team:.*?</strong>(.*?)<br />', arrestedFor.findParent('p').renderContents(), re.I|re.S|re.M)
+                if matches:
+                    college = matches.group(1).replace('(MLB)','').strip()
+                else:
+                    college = "None"
+            else:
+                college = "None"
+            
+            append_list.append(ircutils.bold(datet) + " :: " + title.getText() + " - " + college) # finally add it all
+        
+        daysSince = self._daysSince(str(lastDate.getText()))
+        irc.reply("{0} days since last MLB arrest".format(ircutils.mircColor(daysSince, 'red')))
+        
+        for each in append_list[0:6]:
+            irc.reply(each)
+
+    mlbarrests = wrap(mlbarrests)
     
     
     def mlbstats(self, irc, msg, args, optlist, optplayer):
