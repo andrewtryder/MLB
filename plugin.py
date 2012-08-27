@@ -169,6 +169,43 @@ class MLB(callbacks.Plugin):
     ###################################
     
     
+    def mlbcyyoung(self, irc, msg, args):
+        """
+        Display Cy Young prediction list. Uses a method, based on past results, to predict Cy Young balloting.
+        """
+        
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9mZWF0dXJlcy9jeXlvdW5n')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+        
+        html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL')
+            
+        soup = BeautifulSoup(html)
+        players = soup.findAll('tr', attrs={'class':re.compile('(^oddrow.*?|^evenrow.*?)')})
+
+        cyyoung = collections.defaultdict(list)
+
+        for player in players:
+            colhead = player.findPrevious('tr', attrs={'class':'stathead'}) 
+            rank = player.find('td')
+            playerName = rank.findNext('td')
+            team = playerName.findNext('td')
+            appendString = str(rank.getText() + ". " + ircutils.bold(playerName.getText()) + " (" + team.getText() + ")")
+            cyyoung[str(colhead.getText())].append(appendString)
+
+        for i,x in cyyoung.iteritems():
+            descstring = string.join([item for item in x], " | ")
+            output = "{0} :: {1}".format(ircutils.mircColor(i, 'red'), descstring)
+            irc.reply(output)
+        
+    mlbcyyoung = wrap(mlbcyyoung)
+    
+    
     def mlbseries(self, irc, msg, args, optteam, optopp):
         """[team] [opp]
         Display the remaining games between TEAM and OPP in the current schedule. Ex: NYY TOR
