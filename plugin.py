@@ -169,6 +169,48 @@ class MLB(callbacks.Plugin):
     ###################################
     
     
+    def mlballstargame(self, irc, msg, args, optyear):
+        """[YYYY]
+        Display results for that year's MLB All-Star Game. Ex: 1996. Earliest year is 1933 and latest is this season.
+        """
+        
+        testdate = self._validate(optyear, '%Y')
+        if not testdate:
+            irc.reply("Invalid year. Must be YYYY.")
+            return
+        
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9hbGxzdGFyZ2FtZS9oaXN0b3J5')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        rows = soup.findAll('tr', attrs={'class':re.compile('^evenrow|^oddrow')})
+
+        allstargames = collections.defaultdict(list)
+
+        for row in rows:
+            tds = row.findAll('td')
+            year, score, location, attendance, mvp = tds[0], tds[1], tds[2], tds[4], tds[3]
+            appendString = str("Score: " + score.getText() + "  Location: " + location.getText() + "  Attendance: " + attendance.getText() + "  MVP: " + mvp.getText())
+            allstargames[str(year.getText())].append(appendString)
+
+        outyear = allstargames.get(optyear, None)
+        
+        if not outyear:
+            irc.reply("I could not find MLB All-Star Game information for: %s" % optyear)
+            return
+        else:
+            output = "{0} All-Star Game :: {1}".format(ircutils.bold(optyear), "".join(outyear))
+            irc.reply(output)
+    
+    mlballstargame = wrap(mlballstargame, [('somethingWithoutSpaces')])
+    
+    
     def mlbcyyoung(self, irc, msg, args):
         """
         Display Cy Young prediction list. Uses a method, based on past results, to predict Cy Young balloting.
