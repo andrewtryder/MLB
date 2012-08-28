@@ -169,6 +169,46 @@ class MLB(callbacks.Plugin):
     ###################################
     
     
+    def mlbworldseries(self, irc, msg, args, optyear):
+        """[YYYY]
+        Display results for a MLB World Series that year. Ex: 2000. Earliest year is 1903 and latest is the last postseason.
+        """
+    
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi93b3JsZHNlcmllcy9oaXN0b3J5L3dpbm5lcnM=')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        soup = BeautifulSoup(html)
+        rows = soup.findAll('tr', attrs={'class':re.compile('^evenrow|^oddrow')})
+
+        worldseries = collections.defaultdict(list)
+
+        for row in rows:
+            tds = row.findAll('td')
+            year = tds[0]
+            winner = tds[1].getText()
+            loser = tds[2].getText()
+            series = tds[3].getText()
+            appendString = str("Winner: " + " ".join(winner.split()) + "  Loser: " + " ".join(loser.split()) + "  Series: " + " ".join(series.split()))
+            worldseries[str(year.getText())].append(appendString)
+            
+        outyear = worldseries.get(optyear, None)
+        
+        if not outyear:
+            irc.reply("I could not find MLB World Series information for: %s" % optyear)
+            return
+        else:
+            output = "{0} World Series :: {1}".format(ircutils.bold(optyear), "".join(outyear))
+            irc.reply(output)
+    
+    mlbworldseries = wrap(mlbworldseries, [('somethingWithoutSpaces')])
+    
+    
     def mlballstargame(self, irc, msg, args, optyear):
         """[YYYY]
         Display results for that year's MLB All-Star Game. Ex: 1996. Earliest year is 1933 and latest is this season.
