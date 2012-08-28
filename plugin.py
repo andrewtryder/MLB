@@ -173,7 +173,12 @@ class MLB(callbacks.Plugin):
         """[YYYY]
         Display results for a MLB World Series that year. Ex: 2000. Earliest year is 1903 and latest is the last postseason.
         """
-    
+
+        testdate = self._validate(optyear, '%Y')
+        if not testdate:
+            irc.reply("Invalid year. Must be YYYY.")
+            return
+
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi93b3JsZHNlcmllcy9oaXN0b3J5L3dpbm5lcnM=')
 
         try:
