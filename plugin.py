@@ -1398,7 +1398,7 @@ class MLB(callbacks.Plugin):
                 irc.reply(output)
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
-
+    
 
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """<--expanded|--vsdivision> [ALE|ALC|ALW|NLC|NLC|NLW]
@@ -1413,14 +1413,15 @@ class MLB(callbacks.Plugin):
             if option == 'vsdivision':
                 vsdivision = True
 
-        optdiv = optdiv.lower()
+        optdiv = optdiv.lower() # lower to match keys. values are in the table to match with the html.
+        
         leaguetable =   { 
-                            'ale': {'league':'American League', 'division':'EAST' },
-                            'alc': {'league':'American League', 'division':'CENTRAL' },
-                            'alw': {'league':'American League', 'division':'WEST' },
-                            'nle': {'league':'National League', 'division':'EAST' },
-                            'nlc': {'league':'National League', 'division':'CENTRAL' },
-                            'nlw': {'league':'National League', 'division':'WEST' }
+                            'ale': 'American League EAST',
+                            'alc': 'American League CENTRAL',
+                            'alw': 'American League WEST',
+                            'nle': 'National League EAST',
+                            'nlc': 'National League CENTRAL',
+                            'nlw': 'National League WEST' 
                         }
 
         if optdiv not in leaguetable:
@@ -1441,91 +1442,53 @@ class MLB(callbacks.Plugin):
             irc.reply("Problem opening up: %s" % url)
             return
         
-        html = html.replace('class="evenrow', 'class="oddrow')
+        soup = BeautifulSoup(html) # one of these below will break if formatting changes. 
+        div = soup.find('div', attrs={'class':'mod-container mod-table mod-no-header'}) # div has all
+        table = div.find('table', attrs={'class':'tablehead'}) # table in there
+        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')}) # rows are each team
 
-        soup = BeautifulSoup(html)
-        rows = soup.findAll('tr', attrs={'class': re.compile('^oddrow*')})
+        object_list = [] # list for ordereddict with each entry.
+        lengthlist = collections.defaultdict(list) # sep data structure to determine length. 
 
-        object_list = []
-
-        for row in rows:
-            team = row.find('td', attrs={'align':'left'}).find('a')
-            wins = team.findNext('td')
-            loss = wins.findNext('td')
-            wpct = loss.findNext('td')
-            gmsb = wpct.findNext('td')
-            home = gmsb.findNext('td')
-            road = home.findNext('td')
-            rs = road.findNext('td')
-            ra = rs.findNext('td')
-            diff = ra.findNext('td')
-            strk = diff.findNext('td')
-            if not vsdivision:
-                l10 = strk.findNext('td')
-            if not expanded and not vsdivision:
-                poff = l10.findNext('td')
-
-            div = row.findPrevious('tr', attrs={'class':'colhead'}).findNext('td', attrs={'align':'left'}) 
-
-            if vsdivision:
-                league = row.findPrevious('tr', attrs={'class':'stathead'}).findNext('td', attrs={'colspan': re.compile('^11')})
-            elif expanded:
-                league = row.findPrevious('tr', attrs={'class':'stathead'}).findNext('td', attrs={'colspan': re.compile('^12')})
-            else:
-                league = row.findPrevious('tr', attrs={'class':'stathead'}).findNext('td', attrs={'colspan': re.compile('^13')})
-
+        for row in rows: # this way, we don't need 100 lines to match with each column. works with multi length. 
+            league = row.findPrevious('tr', attrs={'class':'stathead'}) 
+            header = row.findPrevious('tr', attrs={'class':'colhead'}).findAll('td')
+            tds = row.findAll('td')
+    
             d = collections.OrderedDict()
-            d['league'] = league.renderContents().strip()
-            d['div'] = div.renderContents().strip()
-            d['team'] = team.renderContents().strip()
-            d['wins'] = wins.renderContents().strip()
-            d['loss'] = loss.renderContents().strip()
-            d['wpct'] = wpct.renderContents().strip()
-            d['gmsb'] = gmsb.renderContents().strip()
-            d['home'] = home.renderContents().strip()
-            d['road'] = road.renderContents().strip()
-            d['rs'] = rs.renderContents().strip()
-            d['ra'] = ra.renderContents().strip()
-            if expanded or vsdivision:
-                d['diff'] = diff.renderContents().strip()
-            else:
-                d['diff'] = diff.find('span', text=True)
-            d['strk'] = strk.renderContents().strip()
-            if not vsdivision:
-                d['l10'] = l10.renderContents().strip()
-            if not expanded and not vsdivision:
-                d['poff'] = poff.renderContents().strip()
+            division = str(league.getText() + " " + header[0].getText())
+    
+            if division == leaguetable[optdiv]: # from table above. only match what we need.
+                for i,td in enumerate(tds):
+                    if i == 0: # manual replace of team here because the column doesn't say team.
+                        d['TEAM'] = str(tds[0].getText())
+                        lengthlist['TEAM'].append(len(str(tds[0].getText())))
+                    else:
+                        d[str(header[i].getText())] = str(td.getText()).replace('  ',' ') # add to ordereddict + conv multispace to one.
+                        lengthlist[str(header[i].getText())].append(len(str(td.getText()))) # add key based on header, length of string.
+                object_list.append(d)
 
-            object_list.append(d)
+        if len(object_list) > 0: # now that object_list should have entries, sanity check.
+            object_list.insert(0,object_list[0]) # cheap way to copy first item again because we iterate over it for header.
+        else: # bailout if something broke.
+            irc.reply("Something broke returning mlbstandings.")
+            return
+            
+        for i,each in enumerate(object_list):
+            if i == 0: # to print the duplicate but only output the header of the table.
+                headerOut = ""
+                for keys in each.keys(): # only keys on the first list entry, a dummy/clone.
+                    headerOut += "{0:{1}}".format(ircutils.underline(keys),max(lengthlist[keys])+4, key=int) # normal +2 but bold eats up +2 more, so +4.
+                irc.reply(headerOut)
+            else: # print the division now.
+                tableRow = ""
+                for inum,k in enumerate(each.keys()):
+                    if inum == 0: # team here, which we want to bold.
+                        tableRow += "{0:{1}}".format(ircutils.bold(each[k]),max(lengthlist[k])+4, key=int) #+4 since bold eats +2.
+                    else: # rest of the elements outside the team.
+                        tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
+                irc.reply(tableRow) 
 
-        if expanded:
-            header = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7} {11:6}".format( \
-                    "Team", "W", "L", "PCT", "GB", "DAY", "NIGHT", "GRASS", "TURF", "1-RUN", "XTRA", "ExWL")
-        elif vsdivision:
-            header = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7}".format( \
-                    "Team", "W", "L", "PCT", "GB", "EAST", "CENT", "WEST", "INTR", "RHP", "LHP")
-        else:
-            header = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:4} {9:4} {10:<7} {11:6} {12:6}".format( \
-                    "Team", "W", "L", "PCT", "GB", "HOME", "ROAD", "RS", "RA", "DIFF", "STRK", "L10", "POFF")
-
-        irc.reply(header)
-
-        for tm in object_list:
-            if tm['league'] == leaguetable[optdiv].get('league') and tm['div'] == leaguetable[optdiv].get('division'):
-                if expanded:
-                    output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7} {11:6}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
-                    tm['ra'], tm['diff'], tm['strk'], tm['l10'])
-                elif vsdivision:
-                    output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:8} {9:8} {10:<7}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
-                    tm['ra'], tm['diff'], tm['strk'])
-                else:
-                    output = "{0:15} {1:3} {2:3} {3:5} {4:5} {5:8} {6:8} {7:4} {8:4} {9:4} {10:<7} {11:6} {12:6}".format( \
-                    tm['team'], tm['wins'], tm['loss'], tm['wpct'], tm['gmsb'], tm['home'], tm['road'], tm['rs'], \
-                    tm['ra'], tm['diff'], tm['strk'], tm['l10'], tm['poff']) 
-
-                irc.reply(output)
 
     mlbstandings = wrap(mlbstandings, [getopts({'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
 
