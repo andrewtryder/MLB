@@ -293,6 +293,67 @@ class MLB(callbacks.Plugin):
     mlbcyyoung = wrap(mlbcyyoung)
     
     
+    def mlbheadtohead(self, irc, msg, args, optteam, optopp):
+        """[team] [opp]
+        Display the record between two teams head-to-head. EX: NYY BOS
+        This will lookup the record between the away vs. home team and display the year record.
+        """
+        
+        optteam,optopp = optteam.upper(),optopp.upper()
+        
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+        
+        if optopp not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+    
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvZ3JpZA==')
+
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('CHW', 'CWS') # mangle this since.. it's there'
+
+        soup = BeautifulSoup(html)
+        tables = soup.findAll('table', attrs={'class':'tablehead'}) # two tables.
+
+        headToHead = collections.defaultdict(list)
+
+        for table in tables:
+            rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')})
+            for i,row in enumerate(rows): # each rows now.
+                header = row.findPrevious('tr', attrs={'class':'colhead'}).findAll('td')
+                team = row.findAll('td')[0]
+                tds = row.findAll('td')[1:]
+                for j,td in enumerate(tds):
+                    keyString = str(team.getText() + header[j+1].getText()) # key using team+header[j] text since vs. is in it. +1 due to tds being moved [1:]
+                    headToHead[keyString].append(str(td.getText()))
+
+        output = headToHead.get(str(optteam + "vs." + optopp), None) # need to format w/ vs. here to match the key.
+
+        if output:
+            if output is not "--":
+                recordSplit = "".join(output).split('-')
+                win, loss = recordSplit[0], recordSplit[1] #  It is defined as wins divided by wins plus losses (i.e. — the total number of matches)
+                if win.isdigit() and loss.isdigit():
+                    percentage = ("%.3f" % (float(win) / float(int(win)+int(loss)))) # win percentage, limit to 3 precision
+                    irc.reply("Head-to-head record {0} vs. {1} :: {2} ({3})".format(ircutils.bold(optteam), ircutils.bold(optopp), "".join(output), percentage))
+                else: 
+                    irc.reply("Head-to-head record {0} vs. {1} :: {2}".format(ircutils.bold(optteam), ircutils.bold(optopp), "".join(output)))
+            else:
+                irc.reply("Head-to-head record {0} vs. {1} :: {2}".format(ircutils.bold(optteam), ircutils.bold(optopp), "".join(output)))
+        else:
+            irc.reply("Head-to-head record not found for {0} vs. {1}".format(ircutils.bold(optteam), ircutils.bold(optopp)))
+            
+    mlbheadtohead = wrap(mlbheadtohead, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    
+    
     def mlbseries(self, irc, msg, args, optteam, optopp):
         """[team] [opp]
         Display the remaining games between TEAM and OPP in the current schedule. Ex: NYY TOR
