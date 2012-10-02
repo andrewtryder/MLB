@@ -1462,7 +1462,7 @@ class MLB(callbacks.Plugin):
     
 
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
-        """<--expanded|--vsdivision> [ALE|ALC|ALW|NLC|NLC|NLW]
+        """<--expanded|--vsdivision> [ALE|ALC|ALW|NLE|NLC|NLW]
         Display divisional standings for a division. Use --expanded or --vsdivision
         to show extended stats.
         """
