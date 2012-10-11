@@ -308,6 +308,10 @@ class MLB(callbacks.Plugin):
         if optopp not in self._validteams():
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
+        
+        if optteam == optopp:
+            irc.reply("error: Must have different teams in mlbheadtohead")
+            return
     
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvZ3JpZA==')
 
