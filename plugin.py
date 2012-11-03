@@ -960,52 +960,6 @@ class MLB(callbacks.Plugin):
     
     mlbwar = wrap(mlbwar, [('somethingWithoutSpaces')])
 
-        
-    def mlbteamnews(self, irc, msg, args, optteam):
-        """[team]
-        Display the most recent news and articles about a team. Ex: NYY
-        """
-
-        optteam = optteam.upper().strip()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
-            return
-            
-        lookupteam = self._translateTeam('fanfeedr', 'team', optteam) # (db, column, optteam)
-
-        apiKey = self.registryValue('ffApiKey')
-        if not apiKey or apiKey == "Not set":
-            irc.reply("API key not set. see 'config help supybot.plugins.MLB.ffApiKey'.")
-            return
-        
-        url = 'http://ffapi.fanfeedr.com/basic/api/teams/%s/content' % lookupteam
-        url += '?api_key=%s' % apiKey #
-        
-        self.log.info(url)
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
-            return
-        
-        try:
-            jsondata = json.loads(html)
-        except:
-            irc.reply("Could not parse json data")
-            return
-            
-        for each in jsondata[0:6]:
-            origin = each['origin']['name']
-            title = each['title']
-            linkurl = each['url']
-            output = "{0} - {1} {2}".format(ircutils.underline(origin), self._smart_truncate(title, 40),\
-                ircutils.mircColor(self._shortenUrl(linkurl), 'blue'))
-            irc.reply(output)
-
-    mlbteamnews = wrap(mlbteamnews, [('somethingWithoutSpaces')])
 
     def mlbteams(self, irc, msg, args):
         """Display a list of valid teams for input."""
