@@ -1,5 +1,5 @@
 ###
-# Copyright (c) 2012, spline
+# Copyright (c) 2012-2013, spline
 # All rights reserved.
 #
 #
@@ -23,9 +23,6 @@ def configure(advanced):
 
 
 MLB = conf.registerPlugin('MLB')
-# This is where your configuration variables (if any) should go.  For example:
-conf.registerGlobalValue(MLB, 'dbLocation', registry.String(os.path.abspath(os.path.dirname(__file__)) + '/mlb.db', _("""Absolute path for mlb.db sqlite3 database file location.""")))
-conf.registerGlobalValue(MLB, 'ffApiKey', registry.String('', """api key for fanfeedr.com""", private=True))
 conf.registerGlobalValue(MLB, 'usatApiKey', registry.String('', """api key for developer.usatoday.com""", private=True))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:
