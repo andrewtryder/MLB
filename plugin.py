@@ -37,110 +37,132 @@ class MLB(callbacks.Plugin):
         self.__parent.__init__(irc)
         self._mlbdb = os.path.abspath(os.path.dirname(__file__)) + '/db/mlb.db'
 
-    def _validate(self, date, format):
-        """Return true or false for valid date based on format."""
-        try:
-            datetime.datetime.strptime(date, format) # format = "%m/%d/%Y"
-            return True
-        except ValueError:
-            return False
+    ##############
+    # FORMATTING #
+    ##############
 
+    def _red(self, string):
+        """Returns a red string."""
+        return ircutils.mircColor(string, 'red')
 
-    def _smart_truncate(self, text, length, suffix='...'):
-        """Truncates `text`, on a word boundary, as close to
-        the target length it can come.
+    def _yellow(self, string):
+        """Returns a yellow string."""
+        return ircutils.mircColor(string, 'yellow')
+
+    def _green(self, string):
+        """Returns a green string."""
+        return ircutils.mircColor(string, 'green')
+
+    def _bold(self, string):
+        """Returns a bold string."""
+        return ircutils.bold(string)
+
+    def _blue(self, string):
+        """Returns a blue string."""
+        return ircutils.mircColor(string, 'blue')
+
+    def _ul(self, string):
+        """Returns an underline string."""
+        return ircutils.underline(string)
+
+    def _bu(self, string):
+        """Returns a bold/underline string."""
+        return ircutils.bold(ircutils.underline(string))
+
+	######################
+	# INTERNAL FUNCTIONS #
+	######################
+
+    def _splicegen(self, maxchars, stringlist):
+        """Return a group of splices from a list based on the maxchars
+        string-length boundary.
         """
 
-        slen = len(suffix)
-        pattern = r'^(.{0,%d}\S)\s+\S+' % (length-slen-1)
-        if len(text) > length:
-            match = re.match(pattern, text)
-            if match:
-                length0 = match.end(0)
-                length1 = match.end(1)
-                if abs(length0+slen-length) < abs(length1+slen-length):
-                    return match.group(0) + suffix
-                else:
-                    return match.group(1) + suffix
-        return text
-
-
-    def _shortenUrl(self, url):
-        """Returned goo.gl shortened URL."""
-        posturi = "https://www.googleapis.com/urlshortener/v1/url"
-        headers = {'Content-Type' : 'application/json'}
-        data = {'longUrl' : url}
-        data = json.dumps(data)
-        request = urllib2.Request(posturi,data,headers)
-        response = urllib2.urlopen(request)
-        response_data = response.read()
-        shorturi = json.loads(response_data)['id']
-        return shorturi
-
-
-    def _b64decode(self, string):
-        """Returns base64 decoded string."""
-        import base64
-        return base64.b64decode(string)
-
-    def _daysSince(self, string):
-        a = datetime.date.today()
-        b = datetime.datetime.strptime(string, "%B %d, %Y")
-        b = b.date()
-        delta = b - a
-        delta = abs(delta.days)
-        return delta
-
-
-    def _dateFmt(self, string):
-        """Return a short date string from a full date string."""
-        return time.strftime('%m/%d', time.strptime(string, '%B %d, %Y'))
-
+        runningcount = 0
+        tmpslice = []
+        for i, item in enumerate(stringlist):
+            runningcount += len(item)
+            if runningcount <= int(maxchars):
+                tmpslice.append(i)
+            else:
+                yield tmpslice
+                tmpslice = [i]
+                runningcount = len(item)
+        yield(tmpslice)
 
     def _batch(self, iterable, size):
+        """http://code.activestate.com/recipes/303279/#c7"""
+
         c = count()
         for k, g in groupby(iterable, lambda x:c.next()//size):
             yield g
 
-
-    def _millify(self, num):
-        for x in ['','k','M','B','T']:
-            if num < 1000.0:
-              return "%3.1f%s" % (num, x)
-            num /= 1000.0
-
-
-    def _salary(self, flags):
-        """http://developer.usatoday.com/docs/read/salaries"""
-
-        apiKey = self.registryValue('usatApiKey')
-        if not apiKey or apiKey == "Not set":
-            self.log.info("API key not set. see 'config help plugins.MLB.USATapiKey'.")
-            return
-
-        jsonurl = 'http://api.usatoday.com/open/salaries/mlb?%s' % (flags)
-        jsonurl += '&encoding=json'
-        jsonurl += '&api_key=%s' % (apiKey)
-
-        self.log.info(jsonurl)
+    def _validate(self, date, format):
+        """Return true or false for valid date based on format."""
 
         try:
-            request = urllib2.Request(jsonurl)
-            response = urllib2.urlopen(request)
-            response_data = response.read()
-        except urllib2.HTTPError as err:
-            if err.code == 404:
-                irc.reply("Error 404")
-                self.log.warning("Error 404 on: %s" % (jsonurl))
-            elif err.code == 403:
-                irc.reply("Error 403. Try waiting 60 minutes.")
-                self.log.warning("Error 403 on: %s" %s (jsonurl))
+            datetime.datetime.strptime(str(date), format) # format = "%m/%d/%Y"
+            return True
+        except ValueError:
+            return False
+
+    def _httpget(self, url, h=None, d=None):
+        """General HTTP resource fetcher. Supports b64encoded urls."""
+
+        if not url.startswith('http://'):
+            url = self._b64decode(url)
+
+        self.log.info(url)
+
+        try:
+            if h and d:
+                page = utils.web.getUrl(url, headers=h, data=d)
             else:
-                irc.reply("Error. Check the logs.")
-            return
+                page = utils.web.getUrl(url)
+            return page
+        except utils.web.Error as e:
+            self.log.error("I could not open {0} error: {1}".format(url,e))
+            return None
 
-        return response_data
+    def _shortenUrl(self, url):
+        """Shortens a long URL into a short one."""
 
+        try:
+            posturi = "https://www.googleapis.com/urlshortener/v1/url"
+            data = json.dumps({'longUrl' : url})
+            request = urllib2.Request(posturi, data, {'Content-Type':'application/json'})
+            response = urllib2.urlopen(request)
+            return json.loads(response.read())['id']
+        except:
+            return url
+
+    def _b64decode(self, string):
+        """Returns base64 decoded string."""
+
+        import base64
+        return base64.b64decode(string)
+
+    def _dtFormat(self, outfmt, instring, infmt):
+        """Convert from one dateformat to another."""
+
+        try:
+            d = datetime.datetime.strptime(instring, infmt)
+            output = d.strftime(outfmt)
+        except:
+            output = instring
+        return output
+
+    def _millify(self, num):
+        """Turns a number like 1,000,000 into 1M."""
+
+        for unit in ['','k','M','B','T']:
+            if num < 1000.0:
+                return "%3.3f%s" % (num, unit)
+            num /= 1000.0
+
+	######################
+	# DATABASE FUNCTIONS #
+	######################
 
     def _validteams(self):
         """Returns a list of valid teams for input verification."""
@@ -155,7 +177,6 @@ class MLB(callbacks.Plugin):
 
         return teamlist
 
-
     def _translateTeam(self, db, column, optteam):
         """Translates optteam into proper string using database"""
 
@@ -168,40 +189,124 @@ class MLB(callbacks.Plugin):
 
             return (str(row[0]))
 
-
-    ###################################
-    # Public Functions.
-    ###################################
+    ####################
+    # PUBLIC FUNCTIONS #
+    ####################
 
     def mlbcountdown(self, irc, msg, args):
+        """Display countdown until next MLB opening day."""
 
-        oDay = (datetime.datetime(2013,03,31) - datetime.datetime.now()).days
-	irc.reply("{0} day(s) until 2013 MLB Opening Day.".format(oDay))
+        oDay = (datetime.datetime(2014, 03, 31) - datetime.datetime.now()).days
+        irc.reply("{0} day(s) until 2014 MLB Opening Day.".format(oDay))
 
     mlbcountdown = wrap(mlbcountdown)
 
+    def mlbpitcher(self, irc, msg, args, optteam):
+        """<TEAM>
+        Displays current pitcher(s) in game for a specific team.
+        """
+
+        optteam = optteam.upper()
+
+        if optteam not in self._validteams():
+            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            return
+
+        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process scoreboard.
+        soup = BeautifulSoup(html)
+        games = soup.findAll('div', attrs={'id': re.compile('.*?-gamebox')})
+        # container to put all of the teams in.
+        teamdict = collections.defaultdict()
+        # process each "game" (two teams in each)
+        for game in games:
+            teams = game.findAll('p', attrs={'class':'team-name'})
+            for team in teams:  # each game has two teams.
+                ahref = team.find('a')['href']
+                teamname = ahref.split('/')[7].lower()  # will be lowercase.
+                teamname = self._translateTeam('team', 'eshort', teamname)  # fix the espn discrepancy.
+                teamdict[str(teamname)] = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')
+        # grab the gameid. fetch.
+        teamgameid = teamdict.get(optteam)
+        # self.log.info(str(teamdict))
+        # sanity check before we grab the game.
+        if not teamgameid:
+            self.log.info("ERROR: I got {0} as a team. I only have: {1}".format(optteam, str(teamdict)))
+            irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
+            return
+
+        # we have gameid. refetch boxscore for page.
+        # now we fetch the game box score to find the pitchers.
+        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvYm94c2NvcmU=') + '?gameId=%s' % (teamgameid)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # now process the boxscore.
+        soup = BeautifulSoup(html)
+        pitcherpres = soup.findAll('th', text='Pitchers')
+        # defaultdict to put key: team value: pitchers.
+        teampitchers = collections.defaultdict()
+        # should be two, one per team.
+        for pitcherpre in pitcherpres:
+            pitchertable = pitcherpre.findParent('table')
+            pitcherrows = pitchertable.findAll('tr', attrs={'class': re.compile('odd player-.*?|even player-.*?')})
+            for pitcherrow in pitcherrows:  # one pitcher per row.
+                tds = pitcherrow.findAll('td')  # list of all tds.
+                pitchername = self._bold(tds[0].getText().replace('  ',' '))  # fix doublespace.
+                pitcherip = self._bold(tds[1].getText()) + "ip"
+                pitcherhits = self._bold(tds[2].getText()) + "h"
+                pitcherruns = self._bold(tds[3].getText()) + "r"
+                pitcherer = self._bold(tds[4].getText()) + "er"
+                pitcherbb = self._bold(tds[5].getText()) + "bb"
+                pitcherso = self._bold(tds[6].getText()) + "k"
+                pitcherhr = self._bold(tds[7].getText()) + "hr"
+                pitcherpcst = self._bold(tds[8].getText()) + "pc"
+                pitcherera = self._bold(tds[9].getText()) + "era"
+                team = pitcherrow.findPrevious('tr', attrs={'class': 'team-color-strip'}).getText()
+                # must translate team using fulltrans.
+                team = self._translateTeam('team', 'fulltrans', team)
+                # output string for the dict below.
+                pstring = "{0} - {1} {2} {3} {4} {5} {6} {7} {8}".format(pitchername, pitcherip, pitcherhits,\
+                                                                         pitcherruns, pitcherer, pitcherbb, \
+                                                                         pitcherso, pitcherhr, pitcherpcst, \
+                                                                         pitcherera)
+                teampitchers.setdefault(str(team), []).append(pstring)  # append into dict.
+
+        output = teampitchers.get(optteam, None)
+        if not output:
+            irc.reply("ERROR: No pitchers found for {0}. Check when the game is active or finished, not before.".format(optteam))
+            return
+        else:
+            irc.reply("{0} :: {1}".format(self._red(optteam), " | ".join(output)))
+
+    mlbpitcher = wrap(mlbpitcher, [('somethingWithoutSpaces')])
+
     def mlbworldseries(self, irc, msg, args, optyear):
-        """[YYYY]
+        """<YYYY>
         Display results for a MLB World Series that year. Ex: 2000. Earliest year is 1903 and latest is the last postseason.
         """
 
         testdate = self._validate(optyear, '%Y')
         if not testdate:
-            irc.reply("Invalid year. Must be YYYY.")
+            irc.reply("ERROR: Invalid year. Must be YYYY.")
             return
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi93b3JsZHNlcmllcy9oaXN0b3J5L3dpbm5lcnM=')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
-        rows = soup.findAll('tr', attrs={'class':re.compile('^evenrow|^oddrow')})
-
+        rows = soup.findAll('tr', attrs={'class': re.compile('^evenrow|^oddrow')})
         worldseries = collections.defaultdict(list)
 
         for row in rows:
@@ -216,14 +321,13 @@ class MLB(callbacks.Plugin):
         outyear = worldseries.get(optyear, None)
 
         if not outyear:
-            irc.reply("I could not find MLB World Series information for: %s" % optyear)
+            irc.reply("ERROR: I could not find MLB World Series information for: %s" % optyear)
             return
         else:
-            output = "{0} World Series :: {1}".format(ircutils.bold(optyear), "".join(outyear))
+            output = "{0} World Series :: {1}".format(self._bold(optyear), "".join(outyear))
             irc.reply(output)
 
     mlbworldseries = wrap(mlbworldseries, [('somethingWithoutSpaces')])
-
 
     def mlballstargame(self, irc, msg, args, optyear):
         """[YYYY]
