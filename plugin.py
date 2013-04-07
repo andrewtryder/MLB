@@ -641,7 +641,7 @@ class MLB(callbacks.Plugin):
         NOTE: This command is intended for retired/inactive players, not active ones.
         """
 
-        (first, last) = optplayer.split(" ", 1) #playername needs to be "first-last"
+        (first, last) = optplayer.split(" ", 1)  #playername needs to be "first-last"
         searchplayer = first + '-' + last
 
         optyear = False
@@ -650,14 +650,10 @@ class MLB(callbacks.Plugin):
                 optyear = arg
 
         url = self._b64decode('aHR0cDovL3NlYXJjaC5lc3BuLmdvLmNvbS8=') + '%s' % searchplayer
-
-        #self.log.info(url)
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
@@ -672,22 +668,20 @@ class MLB(callbacks.Plugin):
             irc.reply("Could not find a link to career stats for: %s" % optplayer)
             return
         else:
-            #if playercard.find('a', attrs={'href':re.compile('.*?espn.go.com/mlb/players/stats.*?')}):
             link = playercard.find('a', attrs={'href':re.compile('.*?espn.go.com/mlb/players/stats.*?')})['href']
 
         if not link:
             irc.reply("I didn't find the link I needed for career stats. Did something break?")
             return
         else:
-            try:
-                req = urllib2.Request(link)
-                html = (urllib2.urlopen(req)).read()
-            except:
-                irc.reply("Failed to open: %s" % link)
+            html = self._httpget(url)
+            if not html:
+                irc.reply("ERROR: Failed to fetch {0}.".format(url))
+                self.log.error("ERROR opening {0}".format(url))
                 return
 
         soup = BeautifulSoup(html)
-        playerName = soup.find('title')
+        # playerName = soup.find('title')
         table = soup.find('table', attrs={'class':'tablehead'}) # everything stems from the table.
         header = table.find('tr', attrs={'class':'colhead'}).findAll('td') # columns to reference.
 
@@ -705,8 +699,8 @@ class MLB(callbacks.Plugin):
             if not outyear:
                 irc.reply("No stats found for %s in %s" % (optplayer, optyear))
             else:
-                outyear = string.join([item for item in outyear], " | ")
-                irc.reply("{0} :: {1}".format(optplayer,outyear))
+                outyear = " | ".join([item for item in outyear])
+                irc.reply("{0} :: {1}".format(optplayer, outyear))
         else:
             endrows = table.findAll('tr', attrs={'class':re.compile('^evenrow bi$|^oddrow bi$')})
 
@@ -719,16 +713,16 @@ class MLB(callbacks.Plugin):
             del seasonaverages[0] #remove the first td, but match up header via j+2
             del totals[0:2]
 
-            seasonstring = string.join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(seasonaverages)], " | ")
-            totalstring = string.join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(totals)], " | ")
+            seasonstring = " | ".join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(seasonaverages)])
+            totalstring = " | ".join([header[i+2].getText() + ": " + td.getText() for i,td in enumerate(totals)])
 
-            irc.reply("{0} Season Averages :: {1}".format(ircutils.bold(optplayer), seasonstring))
-            irc.reply("{0} Career Totals :: {1}".format(ircutils.bold(optplayer), totalstring))
+            irc.reply("{0} Season Averages :: {1}".format(self._bold(optplayer), seasonstring))
+            irc.reply("{0} Career Totals :: {1}".format(self._bold(optplayer), totalstring))
 
     mlbstats = wrap(mlbstats, [(getopts({'year':('int')})), ('text')])
 
     def mlbgamesbypos (self, irc, msg, args, optteam):
-        """[team]
+        """<team>
         Display a team's games by position. Ex: NYY
         """
 
@@ -738,18 +732,16 @@ class MLB(callbacks.Plugin):
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
 
-        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stop-gap.
+        if optteam == 'CWS':  # didn't want a new table here for one site, so this is a cheap stop-gap.
             optteam = 'chw'
         else:
             optteam = optteam.lower()
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL2xpbmV1cC9fL25hbWU=') + '/%s/' % optteam
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
@@ -762,26 +754,26 @@ class MLB(callbacks.Plugin):
         for row in rows:
             playerPos = row.find('td').find('strong')
             playersList = playerPos.findNext('td')
-            append_list.append(str(ircutils.bold(playerPos.getText()) + " " + playersList.getText()))
+            append_list.append("{0} {1}".format(self._bold(playerPos.getText()), playersList.getText()))
 
-        descstring = string.join([item for item in append_list], " | ")
-        output = "{0} :: {1}".format(ircutils.underline(optteam.upper()), descstring)
+        descstring = " | ".join([item for item in append_list])
+        output = "{0} :: {1}".format(self._red(optteam.upper()), descstring)
 
         irc.reply(output)
 
     mlbgamesbypos = wrap(mlbgamesbypos, [('somethingWithoutSpaces')])
 
-
     def mlbroster(self, irc, msg, args, optlist, optteam):
-        """<--40man|--active> [team]
-        Display active roster for team. Defaults to active roster but use --40man switch to
-        show the entire roster. Ex: --40man NYY
+        """[--40man|--active] <team>
+        Display active roster for team.
+        Defaults to active roster but use --40man switch to show the entire roster.
+        Ex: --40man NYY
         """
 
         optteam = optteam.upper()
 
         if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
             return
 
         active, fortyman = True, False
@@ -801,18 +793,15 @@ class MLB(callbacks.Plugin):
         else: # 40man
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3Jvc3Rlci9fL25hbWU=') + '/%s/' % optteam
 
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
-        html = html.replace('class="evenrow','class="oddrow')
 
         soup = BeautifulSoup(html)
         table = soup.find('div', attrs={'class':'mod-content'}).find('table', attrs={'class':'tablehead'})
-        rows = table.findAll('tr', attrs={'class':re.compile('oddrow player.*?')})
+        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow player.*|^evenrow player.*')})
 
         team_data = collections.defaultdict(list)
 
@@ -821,19 +810,19 @@ class MLB(callbacks.Plugin):
             playerNum = row.find('td')
             playerName = playerNum.findNext('td').find('a')
             playerPos = playerName.findNext('td')
-            team_data[str(playerType.getText())].append(str(playerName.getText() + " (" + playerPos.getText() + ")"))
+            team_data[str(playerType.getText())].append("{0} ({1})".format(playerName.getText(), playerPos.getText()))
 
-        for i,j in team_data.iteritems():
-            output = "{0} {1} :: {2}".format(ircutils.underline(optteam.upper()), ircutils.bold(i), string.join([item for item in j], " | "))
+        for i, j in team_data.iteritems():
+            output = "{0} {1} :: {2}".format(self._red(optteam.upper()), self._bold(i), " | ".join([item for item in j]))
             irc.reply(output)
 
     mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
 
 
     def mlbrosterstats(self, irc, msg, args, optteam):
-        """<team>
-        Displays top 5 youngest/oldest teams. Optionally, use TEAM as argument to display
-        roster stats/averages for MLB team. Ex: NYY
+        """[team]
+        Displays top 5 youngest/oldest teams.
+        Optionally, use TEAM as argument to display roster stats/averages for MLB team. Ex: NYY
         """
 
         if optteam:
@@ -843,12 +832,10 @@ class MLB(callbacks.Plugin):
                 return
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9yb3N0ZXJz')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
@@ -858,136 +845,55 @@ class MLB(callbacks.Plugin):
         object_list = []
 
         for row in rows:
-            rank = row.find('td')
-            team = rank.findNext('td')
-            rhb = team.findNext('td')
-            lhb = rhb.findNext('td')
-            sh = lhb.findNext('td')
-            rhp = sh.findNext('td')
-            lhp = rhp.findNext('td')
-            ht = lhp.findNext('td')
-            wt = ht.findNext('td')
-            age = wt.findNext('td')
-            young = age.findNext('td')
-            old = young.findNext('td')
+            tds = row.findAll('td')
+            team = tds[1].getText()
+            rhb = tds[2].getText()
+            lhb = tds[3].getText()
+            sh = tds[4].getText()
+            rhp = tds[5].getText()
+            lhp = tds[6].getText()
+            ht = tds[7].getText()
+            wt = tds[8].getText()
+            age = tds[9].getText()
+            young = tds[10].getText()
+            old = tds[11].getText()
 
-            aString = str("RHB: " + rhb.getText() + "  LHB: " + lhb.getText() + "  SH: " + sh.getText() + "  RHP: " + rhp.getText() + "  LHP: " + lhp.getText()\
-                + "  AVG HT: " + ht.getText() + "  AVG WEIGHT: " + wt.getText() + "  AVG AGE: " + age.getText() + "  YOUNGEST: " + young.getText() + "  OLDEST: " + old.getText())
+            aString = "RHB: {0}  LHB: {1}  SH: {2}  RHP: {3}  LHP: {4}  AVG HT: {5}  AVG WEIGHT: {6}  AVG AGE: {7}  YOUNGEST: {8}  OLDEST: {9}".format(\
+                        rhb, lhb, sh, rhp, lhp, ht, wt, age, young, old)
 
             d = collections.OrderedDict()
-            d['team'] = str(self._translateTeam('team', 'ename', team.getText()))
-            d['data'] = str(aString)
+            d['team'] = str(self._translateTeam('team', 'ename', team))
+            d['data'] = aString
             object_list.append(d)
 
         if optteam:
             for each in object_list:
-                if each['team'] == optteam: # list will have all teams so we don't need to check
-                    output = "{0} Roster Stats :: {1}".format(ircutils.bold(each['team']), each['data'])
-
+                if each['team'] == optteam:  # list will have all teams so we don't need to check
+                    output = "{0} Roster Stats :: {1}".format(self._red(each['team']), each['data'])
             irc.reply(output)
-
         else:
-
-            youngest_list = []
-            oldest_list = []
-
-            for each in object_list[0:5]:
-                youngest_list.append(each['team'])
-            for each in object_list[-6:-1]:
-                oldest_list.append(each['team'])
-
-            output = "{0} :: {1}".format(ircutils.bold("5 Youngest MLB Teams:"), string.join([item for item in youngest_list], " | "))
+            output = "{0} :: {1}".format(self._bold("5 Youngest MLB Teams:"), " | ".join([item['team'] for item in object_list[0:5]]))
             irc.reply(output)
 
-            output = "{0} :: {1}".format(ircutils.bold("5 Oldest MLB Teams:"), string.join([item for item in oldest_list], " | "))
+            output = "{0} :: {1}".format(self._bold("5 Oldest MLB Teams:"), " | ".join([item['team'] for item in object_list[-6:-1]]))
             irc.reply(output)
 
     mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
 
-
     def mlbteamsalary(self, irc, msg, args, optteam):
-        """[team]
-        Display top 5 salaries for teams. Ex: Yankees
+        """<team>
+        Display top 5 salaries for <team>. Ex: Yankees
         """
 
-        optteam = optteam.upper().strip()
-
+        optteam = optteam.upper()
         if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
             return
-
-        lookupteam = self._translateTeam('short', 'team', optteam) # (db, column, optteam)
-
-        flags = 'seasons=%s&teams=%s' % (datetime.datetime.now().year, lookupteam)
-
-        response_data = self._salary(flags)
-        jsondata = json.loads(response_data)
-
-        if len(jsondata['salaries']) < 1:
-            irc.reply("I did not find any team salary data in %s for %s" % (sportname, team))
-            return
-
-        salaryAverage = str(jsondata['salaries'][0]['average']).replace(",","")
-        salaryMed = str(jsondata['salaries'][0]['med']).replace(",","")
-        salaryStdev = str(jsondata['salaries'][0]['stdev']).replace(",","")
-        salaryTotal = str(jsondata['salaries'][0]['total']).replace(",","")
-
-        s = jsondata['salaries'][0]['salary']
-        ln = lambda x: int(x.get('salary').replace(",",""))
-        esorted = sorted(s, key=ln,reverse=True)
-
-        output = ircutils.bold(ircutils.underline(optteam))
-        output += " " + "Average: " + self._millify(int(salaryAverage))
-        output += " " + "Median: " + self._millify(int(salaryMed))
-        output += " " + "Total: " + self._millify(int(salaryTotal))
-
-        salString = ircutils.bold(ircutils.underline(optteam)) + " (top 5 salary): "
-
-        for i,entry in enumerate(esorted):
-            if i < 6:
-                salaryEntry = self._millify(int(entry['salary'].replace(",","")))
-                salString += salaryEntry + " " + entry['player_full_name'] + "(" + entry['position'] + ") "
-
-        irc.reply(output)
-        irc.reply(salString)
 
     mlbteamsalary = wrap(mlbteamsalary, [('text')])
 
-    # top5 paid players: http://api.usatoday.com/open/salaries/mlb?players=&top=5&seasons=2012
-
-    def mlbsalary(self, irc, msg, args, optplayer):
-        """[player]
-        Get the last 4 years of salary for player name. Ex: Derek Jeter
-        """
-
-        flags='players=%s' % (optplayer.replace(" ","-").strip())
-
-        response_data = self._salary(flags)
-        jsondata = json.loads(response_data)
-
-        length = jsondata.get('salaries', None)[0]
-
-        if length is None:
-            irc.reply("No salary data found for: %s" % optplayer)
-            return
-
-        seasons = jsondata['rootmetadata'][0]['seasons']
-        currentSeason = jsondata['rootmetadata'][0]['currentSeason']
-        salaryAverage = jsondata['salaries'][0]['average'] # here
-        salaryMedian = jsondata['salaries'][0]['med']
-
-        s = jsondata['salaries'][0]['salary']
-        ln = lambda x: x.get('season')
-        esorted = sorted(s, key=ln,reverse=True)
-
-        salString = string.join([i['season']+": "+ self._millify(int(i['salary'].replace(",",""))) for i in esorted], " | ")
-        irc.reply(ircutils.bold(optplayer.title()) + ": " + salString)
-
-    mlbsalary = wrap(mlbsalary, [('text')])
-
-
     def mlbffplayerratings(self, irc, msg, args, optposition):
-        """<position>
+        """[position]
         Display MLB player ratings per position. Positions must be one of:
         Batters | Pitchers | C | 1B | 2B | 3B | SS | 2B/SS | 1B/3B | OF | SP | RP
         """
@@ -997,25 +903,20 @@ class MLB(callbacks.Plugin):
             'OF':'?&slotCategoryId=5', 'SP':'?&slotCategoryId=14', 'RP':'?&slotCategoryId=15' }
 
         if optposition and optposition not in validpositions:
-            irc.reply("Invalid position. Must be one of: %s" % validpositions.keys())
+            irc.reply("ERROR: Invalid position. Must be one of: %s" % validpositions.keys())
             return
 
         url = self._b64decode('aHR0cDovL2dhbWVzLmVzcG4uZ28uY29tL2ZsYi9wbGF5ZXJyYXRlcg==')
-
         if optposition:
             url += '%s' % validpositions[optposition]
 
-        self.log.info(url)
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
-        html = html.replace('&nbsp;',' ')
-
+        #html = html.replace('&nbsp;',' ')
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'id':'playertable_0'})
         rows = table.findAll('tr')[2:12]
@@ -1028,153 +929,84 @@ class MLB(callbacks.Plugin):
             rating = row.find('td', attrs={'class':'playertableData sortedCell'})
             append_list.append(rank.getText() + ". " + ircutils.bold(player.getText()) + " (" + rating.getText() + ")")
 
-        descstring = string.join([item for item in append_list], " | ")
-
+        # output.
         if optposition:
             title = "Top 10 FF projections at: %s" % optposition
         else:
             title = "Top 10 FF projections"
 
-        output = "{0} :: {1}".format(ircutils.mircColor(title, 'red'), descstring)
+        output = "{0} :: {1}".format(self._red(title), " | ".join([item for item in append_list]))
         irc.reply(output)
 
     mlbffplayerratings = wrap(mlbffplayerratings, [optional('somethingWithoutSpaces')])
 
-
-    def mlbwar(self, irc, msg, args, opttype):
-        """[overall|pitching|offense|fielding]
-        Display MLB leaders in WAR for various categories.
+    def mlbteams(self, irc, msg, args):
+        """
+        Display a list of valid teams for input.
         """
 
-        opttype = opttype.lower()
-
-        wartypelist = ['overall','pitching','offense','fielding']
-
-        if opttype not in wartypelist:
-            irc.reply("WAR type must be one of: %s" % wartypelist)
-            return
-
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi8=')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
-            return
-
-        soup = BeautifulSoup(html)
-        regexString = 'war' + opttype + '.*?' # build regex ourselves for searching.
-        div = soup.find('div', attrs={'id':re.compile(regexString)})
-
-        table = div.find('table')
-        rows = table.findAll('tr')[1:] # skip header.
-
-        append_list = []
-
-        for row in rows:
-            rank = row.find('td')
-            player = rank.findNext('td')
-            team = player.findNext('td')
-            war = team.findNext('td')
-            append_list.append(ircutils.bold(player.getText()) + " (" + team.getText() + ") " + war.getText())
-
-        descstring = string.join([item for item in append_list], " | ")
-        output = "{0} {1} :: {2}".format(ircutils.mircColor("WAR Leaders for:", 'red'), ircutils.underline(opttype.title()), descstring)
-
-        irc.reply(output)
-
-    mlbwar = wrap(mlbwar, [('somethingWithoutSpaces')])
-
-
-    def mlbteams(self, irc, msg, args):
-        """Display a list of valid teams for input."""
-
         teams = self._validteams()
-        irc.reply("Valid teams are: %s" % (string.join([item for item in teams], " | ")))
+        irc.reply("Valid MLB teams are: %s" % (" | ".join([item for item in teams])))
 
     mlbteams = wrap(mlbteams)
 
-    def baseball(self, irc, msg, args):
-        """Display a silly baseball."""
-
-        irc.reply("    ____     ")
-        irc.reply("  .'    '.   ")
-        irc.reply(" /"+ircutils.mircColor("'-....-'", 'red') + "\  ")
-        irc.reply(" |        |  ")
-        irc.reply(" \\"+ircutils.mircColor(".-''''-.", 'red') + "/  ")
-        irc.reply("  '.____.'   ")
-
-    baseball = wrap(baseball)
-
-
     def mlbweather(self, irc, msg, args, optteam):
-        """[team]
+        """<team>
         Display weather for MLB team at park they are playing at.
         """
 
-        optteam = optteam.upper().strip()
+        optteam = optteam.upper()
 
         if optteam not in self._validteams():
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
 
         url = self._b64decode('aHR0cDovL3d3dy5wYXJrZmFjdG9ycy5jb20v')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
+        # sanity checking.
         if "an error occurred while processing this directive" in html:
             irc.reply("Something broke with parkfactors. Check back later.")
             return
-
-        html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL') # need some mangling.
+        # need to do some mangling.
+        html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL')
 
         soup = BeautifulSoup(html)
         h3s = soup.findAll('h3')
 
-        object_list = []
+        object_list = collections.defaultdict()
 
-        for h3 in h3s:
+        for h3 in h3s:  # each h3 is a game.
             park = h3.find('span', attrs={'style':'float: left;'})
             factor = h3.find('span', attrs={'style': re.compile('color:.*?')})
             matchup = h3.findNext('h4').find('span', attrs={'style':'float: left;'})
             winddir = h3.findNext('img', attrs={'class':'rose'})
+            winddir = str(''.join(i for i in winddir['src'] if i.isdigit()))
             windspeed = h3.findNext('p', attrs={'class':'windspeed'}).find('span')
-            weather = h3.findNext('h5', attrs={'class':'l'})
+            weather = h3.findNext('h5', attrs={'class':'l'})  #
             if weather.find('img', attrs={'src':'../images/roof.gif'}):
-                weather = "[ROOF] " + weather.text
+                weather = "[ROOF] " + weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
             else:
-                weather = weather.text.strip()
+                weather = weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
 
-            d = collections.OrderedDict()
-            d['park'] = park.renderContents().strip()
-            d['factor'] = factor.renderContents().strip()
-            d['matchup'] = matchup.renderContents().strip()
-            d['winddir'] = str(''.join(i for i in winddir['src'] if i.isdigit()))
-            d['windspeed'] = windspeed.renderContents().strip()
-            d['weather'] = weather.replace('.Later','. Later').replace('&deg;F','F ')
-            object_list.append(d)
+            # now do some split work to get the dict with teams as keys.
+            teams = matchup.getText().split(',', 1)  # NYY at DET, 1:05PM ET
+            for team in teams[0].split('at'):  # ugly but works.
+                #NYY at DET, 1:05PM ET at Comerica Park(+101)  Weather: mostly cloudy, 53F Gentle breeze out to left-center. Later: mostly cloudy  Wind: 12mph (345deg)
+                object_list[str(team.strip())] = "{0}  at {1}({2})  Weather: {3}  Wind: {4}mph  ({5}deg)".format(\
+                    self._ul(matchup.getText()), park.getText(), factor.getText(), weather, windspeed.getText(), winddir)
 
-        output = False
-
-        for each in object_list:
-            if optteam in each['matchup']:
-                output = "{0} at {1}({2})  Weather: {3}  Wind: {4}mph ({5}deg)".format(ircutils.underline(each['matchup']),\
-                    each['park'], each['factor'], each['weather'], each['windspeed'], each['winddir'])
-
+        output = object_list.get(optteam, None)
         if not output:
-            irc.reply("No match-up found for: %s" % optteam)
+            irc.reply("ERROR: No weather found for: %s. Perhaps the team is not playing?" % optteam)
             return
         else:
             irc.reply(output)
 
     mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
-
 
     def mlbvaluations(self, irc, msg, args):
         """Display current MLB team valuations from Forbes."""
