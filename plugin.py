@@ -243,6 +243,7 @@ class MLB(callbacks.Plugin):
             return
         # we have gameid. refetch boxscore for page.
         # now we fetch the game box score to find the pitchers.
+        # everything here from now on is on the actual boxscore page.
         url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvYm94c2NvcmU=') + '?gameId=%s' % (teamgameid)
         html = self._httpget(url)
         if not html:
@@ -256,19 +257,22 @@ class MLB(callbacks.Plugin):
         teampitchers = collections.defaultdict()
         # should be two, one per team.
         if len(pitcherpres) != 2:  # game is too far from starting.
-            pitchers = soup.find('div', attrs={'class': 'line-score clear'})
-            if not pitchers:  # horrible and sloppy but should work.
-                pstring = "Error."
+            if "Box Score not available." in html:  # sometimes the boxscore is not up.
+                pstring = "Box Score not available."
             else:
-                startingpitchers = pitchers.findAll('p')
-                if len(startingpitchers) != 3:  # 3 rows, bottom 2 are the pitchers.
+                pitchers = soup.find('div', attrs={'class': 'line-score clear'})
+                if not pitchers:  # horrible and sloppy but should work.
                     pstring = "Error."
-                else:  # minimal but it should stop most errors.
-                    sp1, sp2 = startingpitchers[1], startingpitchers[2]
-                    gameTime = soup.find('p', attrs={'id':'gameStatusBarText'})  # find time.
-                    pstring = "{0} vs. {1}".format(sp1.getText(), sp2.getText())
-                    if gameTime:  # add gametime if we have it.
-                        pstring += " {0}".format(gameTime.getText())
+                else:
+                    startingpitchers = pitchers.findAll('p')
+                    if len(startingpitchers) != 3:  # 3 rows, bottom 2 are the pitchers.
+                        pstring = "Error."
+                    else:  # minimal but it should stop most errors.
+                        sp1, sp2 = startingpitchers[1], startingpitchers[2]
+                        gameTime = soup.find('p', attrs={'id':'gameStatusBarText'})  # find time.
+                        pstring = "{0} vs. {1}".format(sp1.getText(), sp2.getText())
+                        if gameTime:  # add gametime if we have it.
+                            pstring += " {0}".format(gameTime.getText())
             # now that we've processed above, append to the teampitchers dict.
             teampitchers.setdefault(str(optteam), []).append(pstring)
         else:  # we have the starting pitchers.
@@ -783,14 +787,14 @@ class MLB(callbacks.Plugin):
             if option == '40man':
                 active, fortyman = False, True
 
-        if optteam == 'CWS': # didn't want a new table here for one site, so this is a cheap stop-gap.
+        if optteam == 'CWS':  # didn't want a new table here for one site, so this is a cheap stop-gap.
             optteam = 'chw'
         else:
             optteam = optteam.lower()
 
         if active and not fortyman:
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3Jvc3Rlci9fL25hbWU=') + '/%s/type/active/' % optteam
-        else: # 40man
+        else:  # 40man
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3Jvc3Rlci9fL25hbWU=') + '/%s/' % optteam
 
         html = self._httpget(url)
@@ -995,7 +999,6 @@ class MLB(callbacks.Plugin):
             # now do some split work to get the dict with teams as keys.
             teams = matchup.getText().split(',', 1)  # NYY at DET, 1:05PM ET
             for team in teams[0].split('at'):  # ugly but works.
-                #NYY at DET, 1:05PM ET at Comerica Park(+101)  Weather: mostly cloudy, 53F Gentle breeze out to left-center. Later: mostly cloudy  Wind: 12mph (345deg)
                 object_list[str(team.strip())] = "{0}  at {1}({2})  Weather: {3}  Wind: {4}mph  ({5}deg)".format(\
                     self._ul(matchup.getText()), park.getText(), factor.getText(), weather, windspeed.getText(), winddir)
 
@@ -1009,15 +1012,15 @@ class MLB(callbacks.Plugin):
     mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
 
     def mlbvaluations(self, irc, msg, args):
-        """Display current MLB team valuations from Forbes."""
+        """
+        Display current MLB team valuations from Forbes.
+        """
 
         url = self._b64decode('aHR0cDovL3d3dy5mb3JiZXMuY29tL21sYi12YWx1YXRpb25zL2xpc3Qv')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to load: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
@@ -1026,35 +1029,22 @@ class MLB(callbacks.Plugin):
 
         object_list = []
 
-        for row in rows:
+        for row in rows:  # one team per row.
             rank = row.find('td', attrs={'class':'rank'})
             team = rank.findNext('td')
             value = team.findNext('td')
-            yrchange = value.findNext('td')
-            debtvalue = yrchange.findNext('td')
-            revenue = debtvalue.findNext('td')
-            operinc = revenue.findNext('td')
-            d = collections.OrderedDict()
-            d['rank'] = rank.renderContents().strip()
-            d['team'] = team.find('h3').renderContents().strip()
-            d['value'] = value.renderContents().strip()
-            d['yrchange'] = yrchange.renderContents().strip()
-            d['debtvalue'] = debtvalue.renderContents().strip()
-            d['revenue'] = revenue.renderContents().strip()
-            d['operinc'] = operinc.renderContents().strip()
-            object_list.append(d)
+            object_list.append("{0}. {1} {2}M".format(rank.getText(), team.find('h3').getText(), value.getText()))
 
-        irc.reply(ircutils.mircColor("Current MLB Team Values", 'red') + " (in millions):")
-
-        for N in self._batch(object_list, 7):
-            irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['value'] + "M)" for n in N))
+        # output.
+        irc.reply("{0} (in millions):".format(self._red("Current MLB Team Values")))
+        irc.reply("{0}".format(" | ".join([item for item in object_list])))
 
     mlbvaluations = wrap(mlbvaluations)
-
 
     def mlbremaining(self, irc, msg, args, optteam):
         """[team]
         Display remaining games/schedule for a playoff contender.
+        NOTE: Will only work closer toward the end of the season.
         """
 
         optteam = optteam.upper()
@@ -1064,12 +1054,10 @@ class MLB(callbacks.Plugin):
             return
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         soup = BeautifulSoup(html)
@@ -1095,15 +1083,15 @@ class MLB(callbacks.Plugin):
 
 
     def mlbplayoffs(self, irc, msg, args):
-        """Display playoff matchups if season ended today."""
+        """
+        Display playoff matchups if season ended today.
+        """
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply('Failed to fetch: %s' % (self._b64decode('url')))
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         html = html.replace('sdg', 'sd').replace('sfo', 'sf').replace('tam', 'tb').replace('was', 'wsh').replace('kan', 'kc').replace('chw', 'cws')
@@ -1113,16 +1101,18 @@ class MLB(callbacks.Plugin):
 
         ol = []
 
-        for ea in each: # man is this just a horrible stopgap.
+        for ea in each:  # man is this just a horrible stopgap.
             links = ea.findAll('a')
             for link in links:
                 linksplit = link['href'].split('/')
                 team = linksplit[7]
-                ol.append(team.upper())
+                ol.append(self._bold(team.upper()))
 
-        irc.reply("Playoffs: AL ({0} vs {1}) vs. {2} | {3} vs. {4} || NL: ({5} vs. {6}) vs. {7} | {8} vs. {9}".format(\
-            ircutils.bold(ol[0]), ircutils.bold(ol[1]), ircutils.bold(ol[2]), ircutils.bold(ol[3]), ircutils.bold(ol[4]),\
-            ircutils.bold(ol[5]), ircutils.bold(ol[6]), ircutils.bold(ol[7]), ircutils.bold(ol[8]), ircutils.bold(ol[9])))
+        if len(ol) != 10:
+            irc.reply("I did not find playoff matchups. Check closer to playoffs.")
+        else:
+            irc.reply("Playoffs: AL ({0} vs {1}) vs. {2} | {3} vs. {4} || NL: ({5} vs. {6}) vs. {7} | {8} vs. {9}".format(\
+                ol[0], ol[1], ol[2], ol[3], ol[4], ol[5], ol[6], ol[7], ol[8], ol[9]))
 
     mlbplayoffs = wrap(mlbplayoffs)
 
