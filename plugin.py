@@ -1561,60 +1561,75 @@ class MLB(callbacks.Plugin):
         """
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9wb3dlcnJhbmtpbmdz')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to fetch: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
-        html = html.replace("evenrow", "oddrow")
-
+        # process HTML
         soup = BeautifulSoup(html)
-        table = soup.find('table', attrs={'class': 'tablehead'})
-        prdate = table.find('td', attrs={'colspan': '6'}).renderContents()
-        t1 = table.findAll('tr', attrs={'class': 'oddrow'})
-
-        if len(t1) < 30:
-            irc.reply("Failed to parse MLB Power Rankings. Did something break?")
+        if not soup.find('table', attrs={'class':'tablehead'}):
+            irc.reply("Something broke heavily formatting on powerrankings page.")
             return
 
-        object_list = []
+        # go about regular html business.
+        datehead = soup.find('div', attrs={'class':'date floatleft'})
+        table = soup.find('table', attrs={'class':'tablehead'})
+        headline = table.find('tr', attrs={'class':'stathead'})
+        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow|^evenrow')})
 
-        for row in t1:
-            rowrank = row.find('td', attrs={'class': 'pr-rank'}).renderContents().strip()
-            rowteam = row.find('div', attrs={'style': re.compile('^padding.*')}).find('a').text.strip()
-            rowrecord = row.find('span', attrs={'class': 'pr-record'}).renderContents().strip()
-            rowlastweek = row.find('span', attrs={'class': 'pr-last'}).renderContents().strip().replace("Last Week", "prev")
+        powerrankings = [] # list to hold each one.
+        prtable = {}
 
-            d = collections.OrderedDict()
-            d['rank'] = int(rowrank)
-            d['team'] = str(rowteam)
-            d['record'] = str(rowrecord)
-            d['lastweek'] = str(rowlastweek)
-            object_list.append(d)
+        for row in rows: # one row per team.
+            # teamdict = {} # teamdict to put into powerrankings list.
+            tds = row.findAll('td') # findall tds.
+            rank = tds[0].getText() # rank number.
+            team = tds[1].find('div', attrs={'style':'padding:10px 0;'}).find('a').getText() # finds short.
+            shortteam = self._translateTeam('team', 'fulltrans', team)
+            lastweek = tds[2].find('span', attrs={'class':'pr-last'}).getText()
+            lastweek = lastweek.replace('Last Week:', '').strip() # rank #
+            comment = tds[3].getText() # comment.
+            # check if we're up or down and insert a symbol.
+            if int(rank) < int(lastweek):
+                symbol = self._green('▲')
+            elif int(rank) > int(lastweek):
+                symbol = self._red('▼')
+            else: # - if the same.
+                symbol = "-"
 
-        if prdate:
-            irc.reply(ircutils.mircColor(prdate, 'blue'))
+            # now add the rows to our data structures.
+            powerrankings.append("{0}. {1} (prev: {2} {3})".format(rank, team, symbol, lastweek))
+            prtable[str(shortteam)] = "{0}. {1} (prev: {2} {3}) {4}".format(rank, team, symbol, lastweek, comment)
 
-        for N in self._batch(object_list, 6):
-            irc.reply(' '.join(str(str(n['rank']) + "." + " " + ircutils.bold(n['team'])) + " (" + n['lastweek'] + ")" for n in N))
+        # now output. conditional if we have the team or not.
+        if not optteam: # no team so output the list.
+            irc.reply("{0} :: {1}".format(self._blue(headline.getText()), datehead.getText()))
+            for N in self._batch(powerrankings, 12): # iterate through each team. 12 per line
+                irc.reply("{0}".format(" | ".join([item for item in N])))
+        else: # find the team and only output that team.
+            output = prtable.get(str(optteam), None)
+            if not output:
+                irc.reply("ERROR: I could not find: %s - Something must have gone wrong." % optteam)
+                return
+            else:
+                irc.reply("{0} :: {1}".format(self._blue(headline.getText()), datehead.getText()))
+                irc.reply("{0}".format(output))
 
     mlbpowerrankings = wrap(mlbpowerrankings)
 
-
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
-        """[TEAM] [category]
+        """<team> <category>
         Display leaders on a team in stats for a specific category.
         Ex. NYY hr
         """
 
-        optteam = optteam.upper().strip()
-        optcategory = optcategory.lower().strip()
+        optteam = optteam.upper()
+        optcategory = optcategory.lower()
 
         if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
             return
 
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct',
@@ -1624,92 +1639,83 @@ class MLB(callbacks.Plugin):
                     'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP' }
 
         if optcategory not in category:
-            irc.reply("Error. Category must be one of: %s" % category.keys())
+            irc.reply("ERROR: Category must be one of: {0}".format(category.keys()))
             return
 
         lookupteam = self._translateTeam('eid', 'team', optteam)
 
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW1zdGF0cw==') + '?teamId=%s&lang=EN&category=%s&y=1&wjb=' % (lookupteam, category[optcategory])
         # &season=2012
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to fetch: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
-        html = html.replace('<b  >', '<b>')
-        html = html.replace('class="ind alt', 'class="ind')
-        html = html.replace('class="ind tL', 'class="ind')
-
+        # process html.
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'class':'table'})
         rows = table.findAll('tr')
 
         object_list = []
+        # grab the first five and go.
+        for row in rows[1:6]:
+            tds = row.findAll('td')
+            rank = tds[0].getText()
+            player = tds[1].getText()
+            stat = tds[2].getText()
+            object_list.append("{0}. {1} {2}".format(rank, player, stat))
 
-        for row in rows[1:6]: # grab the first through ten.
-            rank = row.find('td', attrs={'class':'ind', 'width': '10%'}).renderContents().strip()
-            player = row.find('td', attrs={'class':'ind', 'width': '65%'}).find('a').renderContents().strip()
-            stat = row.find('td', attrs={'class':'ind', 'width': '25%'}).renderContents().strip()
-            object_list.append(rank + ". " + player + " " + stat)
-
-        thelist = string.join([item for item in object_list], " | ")
-        irc.reply("Leaders in %s for %s: %s" % (ircutils.bold(optteam.upper()), ircutils.bold(optcategory.upper()), thelist))
+        thelist = " | ".join([item for item in object_list])
+        irc.reply("{0} leaders for {1} :: {2}".format(self._red(optteam), self._bold(optcategory.upper()), thelist))
 
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
-
     def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
-        """[MLB|AL|NL] [category]
-        Display leaders (top 5) in category for teams in the MLB.
-        Categories: hr, avg, rbi, ra, sb, era, whip, k
+        """<MLB|AL|NL> <category>
+        Display top 10 teams in category for a specific stat. Categories: hr, avg, rbi, ra, sb, era, whip, k
+        Ex: MLB hr or AL rbi or NL era
         """
 
-        league = {'mlb': '9', 'al':'7', 'nl':'8'} # do our own translation here for league/category.
+        league = {'mlb': '9', 'al':'7', 'nl':'8'}  # do our own translation here for league/category.
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'ra':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
 
-        optleague = optleague.lower()
-        optcategory = optcategory.lower()
+        optleague, optcategory = optleague.lower(), optcategory.lower()
 
         if optleague not in league:
-            irc.reply("League must be one of: %s" % league.keys())
+            irc.reply("ERROR: League must be one of: {0}".format(league.keys()))
             return
 
         if optcategory not in category:
-            irc.reply("Category must be one of: %s" % category.keys())
+            irc.reply("ERROR: Category must be one of: {0}".format(category.keys()))
             return
 
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2FnZ3JlZ2F0ZXM=') + '?category=%s&groupId=%s&y=1&wjb=' % (category[optcategory], league[optleague])
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to fetch: %s" % url)
+        # construct url
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2FnZ3JlZ2F0ZXM=')
+        url += '?category=%s&groupId=%s&y=1&wjb=' % (category[optcategory], league[optleague])
+        # fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
-        html = html.replace('class="ind alt nw"', 'class="ind nw"')
-
+        # process html.
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'class':'table'})
         rows = table.findAll('tr')
 
         append_list = []
-
-        for row in rows[1:6]:
-            rank = row.find('td', attrs={'class':'ind nw', 'nowrap':'nowrap', 'width':'10%'}).renderContents()
-            team = row.find('td', attrs={'class':'ind nw', 'nowrap':'nowrap', 'width':'70%'}).find('a').text
-            num = row.find('td', attrs={'class':'ind nw', 'nowrap':'nowrap', 'width':'20%'}).renderContents()
-            append_list.append(rank + ". " + team + " " + num)
-
-        thelist = string.join([item for item in append_list], " | ")
-
-        irc.reply("Leaders in %s for %s: %s" % (ircutils.bold(optleague.upper()), ircutils.bold(optcategory.upper()), thelist))
+        # one per row. first row = header. top 5 only.
+        for row in rows[1:11]:
+            tds = row.findAll('td')
+            rank = tds[0].getText()
+            team = tds[1].getText()
+            num = tds[2].getText()
+            append_list.append("{0}. {1} {2}".format(rank, team, num))
+        # output
+        thelist = " | ".join([item for item in append_list])
+        irc.reply("Leaders in %s for %s: %s" % (self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
 
     mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
 
     def mlbrumors(self, irc, msg, args):
         """
@@ -1717,34 +1723,30 @@ class MLB(callbacks.Plugin):
         """
 
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3J1bW9ycz93amI9')
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Something broke trying to read: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
-        html = html.replace('<div class="ind alt">', '<div class="ind">')
 
         soup = BeautifulSoup(html)
-        t1 = soup.findAll('div', attrs={'class': 'ind'})
+        t1 = soup.findAll('div', attrs={'class':re.compile('ind|ind alt')})
 
         if len(t1) < 1:
-            irc.reply("No mlb rumors found. Check formatting?")
+            irc.reply("ERROR: No mlb rumors found.")
             return
         for t1rumor in t1[0:7]:
-            item = t1rumor.find('div', attrs={'class': 'noborder bold tL'}).renderContents()
+            item = t1rumor.find('div', attrs={'class': 'noborder bold tL'})
             item = re.sub('<[^<]+?>', '', item)
             rumor = t1rumor.find('div', attrs={'class': 'inline rumorContent'}).renderContents().replace('\r','')
-            irc.reply(ircutils.bold(item) + " :: " + rumor)
+            irc.reply(self._bold(item) + " :: " + rumor)
 
     mlbrumors = wrap(mlbrumors)
 
-
     def mlbteamtrans(self, irc, msg, args, optteam):
         """[team]
-        Shows recent MLB transactions for [team]. Ex: NYY
+        Shows recent MLB transactions for a team.
+        Ex: NYY
         """
 
         optteam = optteam.upper().strip()
@@ -1756,14 +1758,12 @@ class MLB(callbacks.Plugin):
         lookupteam = self._translateTeam('eid', 'team', optteam)
 
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW10cmFuc2FjdGlvbnM=') + '?teamId=%s&wjb=' % lookupteam
-        self.log.info(url)
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to load: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
+
 
         html = html.replace('<div class="ind tL"','<div class="ind"').replace('<div class="ind alt"','<div class="ind"')
 
