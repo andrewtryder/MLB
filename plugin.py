@@ -421,7 +421,7 @@ class MLB(callbacks.Plugin):
 
         for i,x in cyyoung.iteritems():
             descstring = " | ".join([item for item in x])
-            output = "{0} :: {1}".format(self._red('red'), descstring)
+            output = "{0} :: {1}".format(self._red(i), descstring)
             irc.reply(output)
 
     mlbcyyoung = wrap(mlbcyyoung)
@@ -534,14 +534,14 @@ class MLB(callbacks.Plugin):
             else:
                 mOpp = self._translateTeam('team', 'ename', mOpp.strip())
             if datetime.datetime.strptime(mDate + " " + currentYear, '%b %d %Y').date() >= datetime.date.today():  # only show what's after today
-                append_list.append(mDate + " - " + ircutils.bold(mOpp) + " " + mTime)
+                append_list.append(mDate + " - " + self._bold(mOpp) + " " + mTime)
 
         for each in append_list: # here, we go through all remaining games, only pick the ones with the opp in it, and go from there.
             if optopp in each: # this is real cheap using string matching instead of assigning keys, but easier.
                 out_list.append(each)
 
         if len(out_list) > 0:
-            descstring = string.join([item for item in out_list], " | ")
+            descstring = " | ".join([item for item in out_list])
             output = "There are {0} games between {1} and {2} :: {3}".format(self._red(len(out_list)), self._bold(optteam), self._bold(optopp), descstring)
             irc.reply(output)
         else:
@@ -1717,77 +1717,46 @@ class MLB(callbacks.Plugin):
 
     mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
-    def mlbrumors(self, irc, msg, args):
-        """
-        Display the latest mlb rumors.
-        """
-
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3J1bW9ycz93amI9')
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-
-        soup = BeautifulSoup(html)
-        t1 = soup.findAll('div', attrs={'class':re.compile('ind|ind alt')})
-
-        if len(t1) < 1:
-            irc.reply("ERROR: No mlb rumors found.")
-            return
-        for t1rumor in t1[0:7]:
-            item = t1rumor.find('div', attrs={'class': 'noborder bold tL'})
-            item = re.sub('<[^<]+?>', '', item)
-            rumor = t1rumor.find('div', attrs={'class': 'inline rumorContent'}).renderContents().replace('\r','')
-            irc.reply(self._bold(item) + " :: " + rumor)
-
-    mlbrumors = wrap(mlbrumors)
-
     def mlbteamtrans(self, irc, msg, args, optteam):
         """[team]
         Shows recent MLB transactions for a team.
         Ex: NYY
         """
 
-        optteam = optteam.upper().strip()
+        optteam = optteam.upper()
 
         if optteam not in self._validteams():
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
 
         lookupteam = self._translateTeam('eid', 'team', optteam)
-
+        # fetch url.
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW10cmFuc2FjdGlvbnM=') + '?teamId=%s&wjb=' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
-
-        html = html.replace('<div class="ind tL"','<div class="ind"').replace('<div class="ind alt"','<div class="ind"')
-
+        # process html.
         soup = BeautifulSoup(html)
-        t1 = soup.findAll('div', attrs={'class': 'ind'})
-
+        t1 = soup.findAll('div', attrs={'class':re.compile('ind|ind tL|ind alt')})
+        # sanity check.
         if len(t1) < 1:
-            irc.reply("No transactions found for %s" % optteam)
+            irc.reply("ERROR: No transactions found for: {0}".format(optteam))
             return
-
-        for item in t1:
-            if "href=" not in str(item):
-                trans = item.findAll(text=True)
-                irc.reply("{0:8} {1}".format(ircutils.bold(str(trans[0])), str(trans[1])))
+        else:
+            for item in t1:
+                if "href=" not in str(item):
+                    trans = item.findAll(text=True)
+                    irc.reply("{0:8} {1}".format(self._bold(trans[0]), trans[1]))
 
     mlbteamtrans = wrap(mlbteamtrans, [('somethingWithoutSpaces')])
 
-
     def mlbtrans(self, irc, msg, args, optdate):
         """[YYYYmmDD]
-        Display all mlb transactions. Will only display today's. Use date in format: 20120912
+        Display all mlb transactions. Will only display today's.
+        Use date in format: 20120912 to display other dates.
         """
-
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RyYW5zYWN0aW9ucz93amI9')
 
         if optdate:
             try:
@@ -1800,47 +1769,40 @@ class MLB(callbacks.Plugin):
             now = datetime.datetime.now()
             optdate = now.strftime("%Y%m%d")
 
-        url += '&date=%s' % optdate
-
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Something broke trying to read: %s" % url)
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RyYW5zYWN0aW9ucz93amI9') + '&date=%s' % optdate
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
 
         if "No transactions today." in html:
-            irc.reply("No transactions for: %s" % optdate)
+            irc.reply("ERROR: No transactions for: {0}".format(optdate))
             return
 
         soup = BeautifulSoup(html)
-        t1 = soup.findAll('div', attrs={'class': 'ind alt'})
-        t1 += soup.findAll('div', attrs={'class': 'ind'})
+        t1 = soup.findAll('div', attrs={'class':re.compile('ind alt|ind')})
 
-        out_array = []
+        out_list = []
 
+        if len(t1) < 1:
+            irc.reply("ERROR: I did not find any MLB transactions for: {0}".format(optdate))
+            return
         for trans in t1:
+            irc.reply("Displaying all MLB transactions for: {0}".format(self._ul(optdate)))
             if "<a href=" not in trans: # no links
                 match1 = re.search(r'<b>(.*?)</b><br />(.*?)</div>', str(trans), re.I|re.S) #strip out team and transaction
                 if match1:
-                    team = match1.group(1)
+                    team = match1.group(1) # shorten here?
                     transaction = match1.group(2)
-                    output = ircutils.mircColor(team, 'red') + " - " + ircutils.bold(transaction)
-                    out_array.append(output)
-
-        if len(out_array) > 0:
-            for output in out_array:
-                irc.reply(output)
-        else:
-            irc.reply("Did something break?")
-            return
+                    irc.reply("{0} - {1}".format(self._red(team), transaction))
 
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
 
-
     def mlbprob(self, irc, msg, args, optteam):
         """<TEAM>
-        Display the MLB probables for a team over the next 5 stars. Ex: NYY
+        Display the MLB probables for a team over the next 5 stars.
+        Ex: NYY
         """
 
         # without optdate and optteam, we only do a single day (today)
