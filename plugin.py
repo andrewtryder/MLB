@@ -884,9 +884,29 @@ class MLB(callbacks.Plugin):
 
     mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
 
-    def mlbteamsalary(self, irc, msg, args, optteam):
+    def _format_cap(self, figure):
+        """Format cap numbers for mlbpayroll command."""
+
+        figure = figure.replace(',', '').strip()  # remove commas.
+        if figure.startswith('-'):  # figure out if we're a negative number.
+            negative = True
+            figure = figure.replace('-','')
+        else:
+            negative = False
+
+        try: # try and millify.
+            figure = self._millify(float(figure))
+        except:
+            figure = figure
+
+        if negative:
+            figure = "-" + figure
+        # now return
+        return figure
+
+    def mlbpayroll(self, irc, msg, args, optteam):
         """<team>
-        Display top 5 salaries for <team>. Ex: Yankees
+        Display payroll situation for <team>. Ex: NYY
         """
 
         optteam = optteam.upper()
@@ -894,7 +914,44 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
             return
 
-    mlbteamsalary = wrap(mlbteamsalary, [('text')])
+        lookupteam = self._translateTeam('st', 'team', optteam)
+
+        url = self._b64decode('aHR0cDovL3d3dy5zcG90cmFjLmNvbS9tbGIv') + '%s/team-payroll/' % lookupteam
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+
+        soup = BeautifulSoup(html)
+        teamtitle = soup.find('title')
+        tbody = soup.find('tbody')
+
+        payroll = []
+
+        paytds = tbody.findAll('td', attrs={'class':'total team total-title'})
+        for paytd in paytds:
+            row = paytd.findPrevious('tr')
+            paytitle = row.find('td', attrs={'class': 'total team total-title'})
+            payfigure = row.find('td', attrs={'class': 'total figure'})
+            payfigure = self._format_cap(payfigure.getText())
+            payroll.append("{0}: {1}".format(self._ul(paytitle.getText()), payfigure))
+
+        # we need the last row. this is horrible but works.
+        bottomrow = tbody.findAll('tr')
+        bottomtds = bottomrow[-1].findAll('td')
+        # take each TD, format the cap, all from last row.
+        basesalary = self._format_cap(bottomtds[1].getText())
+        signingbonus = self._format_cap(bottomtds[2].getText())
+        otherbonus = self._format_cap(bottomtds[3].getText())
+        totalpayroll = self._format_cap(bottomtds[4].getText())
+        # now output.
+        irc.reply("{0} :: Base Salaries {1} | Signing Bonuses {2} | Other Bonus {3} :: TOTAL PAYROLL {4}".format(\
+            self._red(teamtitle.getText()), self._bold(basesalary), self._bold(signingbonus),\
+                self._bold(otherbonus), self._bold(totalpayroll)))
+        irc.reply("{0} :: {1}".format(self._red(teamtitle.getText()), " | ".join([item for item in payroll])))
+
+    mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
 
     def mlbffplayerratings(self, irc, msg, args, optposition):
         """[position]
