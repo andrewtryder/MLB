@@ -212,7 +212,7 @@ class MLB(callbacks.Plugin):
         if optteam not in self._validteams():
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
-
+        # build url and fetch scoreboard.
         url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
         html = self._httpget(url)
         if not html:
