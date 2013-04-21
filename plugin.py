@@ -209,7 +209,6 @@ class MLB(callbacks.Plugin):
         # note: mlbpitcher is normally handled by another bot. only doing
         # this as a supplement until the original bot owner fixes it.
         optteam = optteam.upper()
-
         if optteam not in self._validteams():
             irc.reply("Team not found. Must be one of: %s" % self._validteams())
             return
@@ -231,83 +230,83 @@ class MLB(callbacks.Plugin):
             for team in teams:  # each game has two teams.
                 ahref = team.find('a')['href']
                 teamname = ahref.split('/')[7].lower()  # will be lowercase.
-                teamname = self._translateTeam('team', 'eshort', teamname)  # fix the espn discrepancy.
-                teamdict[str(teamname)] = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')
+                teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+                teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
+                teamdict.setdefault(str(teamname), []).append(teamid)
         # grab the gameid. fetch.
-        teamgameid = teamdict.get(optteam)
-        # self.log.info(str(teamdict))
+        teamgameids = teamdict.get(optteam)
         # sanity check before we grab the game.
-        if not teamgameid:
+        if not teamgameids:
             self.log.info("ERROR: I got {0} as a team. I only have: {1}".format(optteam, str(teamdict)))
             irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
             return
         # we have gameid. refetch boxscore for page.
         # now we fetch the game box score to find the pitchers.
         # everything here from now on is on the actual boxscore page.
-        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvYm94c2NvcmU=') + '?gameId=%s' % (teamgameid)
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # now process the boxscore.
-        soup = BeautifulSoup(html)
-        pitcherpres = soup.findAll('th', text='Pitchers')
-        # defaultdict to put key: team value: pitchers.
-        teampitchers = collections.defaultdict()
-        # should be two, one per team.
-        if len(pitcherpres) != 2:  # game is too far from starting.
-            if "Box Score not available." in html:  # sometimes the boxscore is not up.
-                pstring = "Box Score not available."
-            else:
-                pitchers = soup.find('div', attrs={'class': 'line-score clear'})
-                if not pitchers:  # horrible and sloppy but should work.
-                    pstring = "Error."
+        for teamgameid in teamgameids:  # we had to do foreach due to doubleheaders.
+            url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvYm94c2NvcmU=') + '?gameId=%s' % (teamgameid)
+            html = self._httpget(url)
+            if not html:
+                irc.reply("ERROR: Failed to fetch {0}.".format(url))
+                self.log.error("ERROR opening {0}".format(url))
+                return
+            # now process the boxscore.
+            soup = BeautifulSoup(html)
+            pitcherpres = soup.findAll('th', text='Pitchers')
+            # defaultdict to put key: team value: pitchers.
+            teampitchers = collections.defaultdict()
+            # should be two, one per team.
+            if len(pitcherpres) != 2:  # game is too far from starting.
+                if "Box Score not available." in html:  # sometimes the boxscore is not up.
+                    pstring = "Box Score not available."
                 else:
-                    startingpitchers = pitchers.findAll('p')
-                    if len(startingpitchers) != 3:  # 3 rows, bottom 2 are the pitchers.
+                    pitchers = soup.find('div', attrs={'class': 'line-score clear'})
+                    if not pitchers:  # horrible and sloppy but should work.
                         pstring = "Error."
-                    else:  # minimal but it should stop most errors.
-                        sp1, sp2 = startingpitchers[1], startingpitchers[2]
-                        gameTime = soup.find('p', attrs={'id':'gameStatusBarText'})  # find time.
-                        pstring = "{0} vs. {1}".format(sp1.getText(), sp2.getText())
-                        if gameTime:  # add gametime if we have it.
-                            pstring += " {0}".format(gameTime.getText())
-            # now that we've processed above, append to the teampitchers dict.
-            teampitchers.setdefault(str(optteam), []).append(pstring)
-        else:  # we have the starting pitchers.
-            for pitcherpre in pitcherpres:
-                pitchertable = pitcherpre.findParent('table')
-                pitcherrows = pitchertable.findAll('tr', attrs={'class': re.compile('odd player-.*?|even player-.*?')})
-                for pitcherrow in pitcherrows:  # one pitcher per row.
-                    tds = pitcherrow.findAll('td')  # list of all tds.
-                    pitchername = self._bold(tds[0].getText().replace('  ',' '))  # fix doublespace.
-                    pitcherip = self._bold(tds[1].getText()) + "ip"
-                    pitcherhits = self._bold(tds[2].getText()) + "h"
-                    pitcherruns = self._bold(tds[3].getText()) + "r"
-                    pitcherer = self._bold(tds[4].getText()) + "er"
-                    pitcherbb = self._bold(tds[5].getText()) + "bb"
-                    pitcherso = self._bold(tds[6].getText()) + "k"
-                    pitcherhr = self._bold(tds[7].getText()) + "hr"
-                    pitcherpcst = self._bold(tds[8].getText()) + "pc"
-                    pitcherera = self._bold(tds[9].getText()) + "era"
-                    team = pitcherrow.findPrevious('tr', attrs={'class': 'team-color-strip'}).getText()
-                    # must translate team using fulltrans.
-                    team = self._translateTeam('team', 'fulltrans', team)
-                    # output string for the dict below.
-                    pstring = "{0} - {1} {2} {3} {4} {5} {6} {7} {8}".format(pitchername, pitcherip, pitcherhits,\
-                                                                             pitcherruns, pitcherer, pitcherbb, \
-                                                                             pitcherso, pitcherhr, pitcherpcst, \
-                                                                             pitcherera)
-                    teampitchers.setdefault(str(team), []).append(pstring)  # append into dict.
-
-        # now, lets attempt to output.
-        output = teampitchers.get(optteam, None)
-        if not output:  # something went horribly wrong if we're here.
-            irc.reply("ERROR: No pitchers found for {0}. Check when the game is active or finished, not before.".format(optteam))
-            return
-        else:  # ok, things did work.
-            irc.reply("{0} :: {1}".format(self._red(optteam), " | ".join(output)))
+                    else:
+                        startingpitchers = pitchers.findAll('p')
+                        if len(startingpitchers) != 3:  # 3 rows, bottom 2 are the pitchers.
+                            pstring = "Error."
+                        else:  # minimal but it should stop most errors.
+                            sp1, sp2 = startingpitchers[1], startingpitchers[2]
+                            gameTime = soup.find('p', attrs={'id':'gameStatusBarText'})  # find time.
+                            pstring = "{0} vs. {1}".format(sp1.getText(), sp2.getText())
+                            if gameTime:  # add gametime if we have it.
+                                pstring += " {0}".format(gameTime.getText())
+                # now that we've processed above, append to the teampitchers dict.
+                teampitchers.setdefault(str(optteam), []).append(pstring)
+            else:  # we have the starting pitchers.
+                for pitcherpre in pitcherpres:
+                    pitchertable = pitcherpre.findParent('table')
+                    pitcherrows = pitchertable.findAll('tr', attrs={'class': re.compile('odd player-.*?|even player-.*?')})
+                    for pitcherrow in pitcherrows:  # one pitcher per row.
+                        tds = pitcherrow.findAll('td')  # list of all tds.
+                        pitchername = self._bold(tds[0].getText().replace('  ',' '))  # fix doublespace.
+                        pitcherip = self._bold(tds[1].getText()) + "ip"
+                        pitcherhits = self._bold(tds[2].getText()) + "h"
+                        pitcherruns = self._bold(tds[3].getText()) + "r"
+                        pitcherer = self._bold(tds[4].getText()) + "er"
+                        pitcherbb = self._bold(tds[5].getText()) + "bb"
+                        pitcherso = self._bold(tds[6].getText()) + "k"
+                        pitcherhr = self._bold(tds[7].getText()) + "hr"
+                        pitcherpcst = self._bold(tds[8].getText()) + "pc"
+                        pitcherera = self._bold(tds[9].getText()) + "era"
+                        team = pitcherrow.findPrevious('tr', attrs={'class': 'team-color-strip'}).getText()
+                        # must translate team using fulltrans.
+                        team = self._translateTeam('team', 'fulltrans', team)
+                        # output string for the dict below.
+                        pstring = "{0} - {1} {2} {3} {4} {5} {6} {7} {8}".format(pitchername, pitcherip, pitcherhits,\
+                                                                                 pitcherruns, pitcherer, pitcherbb, \
+                                                                                 pitcherso, pitcherhr, pitcherpcst, \
+                                                                                 pitcherera)
+                        teampitchers.setdefault(str(team), []).append(pstring)  # append into dict.
+            # now, lets attempt to output.
+            output = teampitchers.get(optteam, None)
+            if not output:  # something went horribly wrong if we're here.
+                irc.reply("ERROR: No pitchers found for {0}. Check when the game is active or finished, not before.".format(optteam))
+                return
+            else:  # ok, things did work.
+                irc.reply("{0} :: {1}".format(self._red(optteam), " | ".join(output)))
 
     mlbpitcher = wrap(mlbpitcher, [('somethingWithoutSpaces')])
 
