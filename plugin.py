@@ -313,7 +313,8 @@ class MLB(callbacks.Plugin):
 
     def mlbworldseries(self, irc, msg, args, optyear):
         """<YYYY>
-        Display results for a MLB World Series that year. Ex: 2000. Earliest year is 1903 and latest is the last postseason.
+        Display results for a MLB World Series that year. Earliest year is 1903 and latest is the last postseason.
+        Ex: 2000.
         """
 
         testdate = self._validate(optyear, '%Y')
