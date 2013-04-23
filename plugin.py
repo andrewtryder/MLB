@@ -1683,23 +1683,19 @@ class MLB(callbacks.Plugin):
             return
 
         # go about regular html business.
-        datehead = soup.find('div', attrs={'class':'date floatleft'})
+        # datehead = soup.find('div', attrs={'class':'date floatleft'})
         table = soup.find('table', attrs={'class':'tablehead'})
         headline = table.find('tr', attrs={'class':'stathead'})
         rows = table.findAll('tr', attrs={'class':re.compile('^oddrow|^evenrow')})
-
-        powerrankings = [] # list to hold each one.
-        prtable = {}
-
+        # list for each team.
+        powerrankings = []
+        # each row is a team.
         for row in rows: # one row per team.
-            # teamdict = {} # teamdict to put into powerrankings list.
             tds = row.findAll('td') # findall tds.
             rank = tds[0].getText() # rank number.
             team = tds[1].find('div', attrs={'style':'padding:10px 0;'}).find('a').getText() # finds short.
-            shortteam = self._translateTeam('team', 'fulltrans', team)
             lastweek = tds[2].find('span', attrs={'class':'pr-last'}).getText()
             lastweek = lastweek.replace('Last Week:', '').strip() # rank #
-            comment = tds[3].getText() # comment.
             # check if we're up or down and insert a symbol.
             if int(rank) < int(lastweek):
                 symbol = self._green('▲')
@@ -1707,24 +1703,13 @@ class MLB(callbacks.Plugin):
                 symbol = self._red('▼')
             else: # - if the same.
                 symbol = "-"
-
             # now add the rows to our data structures.
             powerrankings.append("{0}. {1} (prev: {2} {3})".format(rank, team, symbol, lastweek))
-            prtable[str(shortteam)] = "{0}. {1} (prev: {2} {3}) {4}".format(rank, team, symbol, lastweek, comment)
 
         # now output. conditional if we have the team or not.
-        if not optteam: # no team so output the list.
-            irc.reply("{0} :: {1}".format(self._blue(headline.getText()), datehead.getText()))
-            for N in self._batch(powerrankings, 12): # iterate through each team. 12 per line
-                irc.reply("{0}".format(" | ".join([item for item in N])))
-        else: # find the team and only output that team.
-            output = prtable.get(str(optteam), None)
-            if not output:
-                irc.reply("ERROR: I could not find: %s - Something must have gone wrong." % optteam)
-                return
-            else:
-                irc.reply("{0} :: {1}".format(self._blue(headline.getText()), datehead.getText()))
-                irc.reply("{0}".format(output))
+        irc.reply("{0}".format(self._blue(headline.getText())))
+        for N in self._batch(powerrankings, 12): # iterate through each team. 12 per line
+            irc.reply("{0}".format(" | ".join([item for item in N])))
 
     mlbpowerrankings = wrap(mlbpowerrankings)
 
