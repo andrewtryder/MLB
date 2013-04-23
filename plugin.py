@@ -204,6 +204,7 @@ class MLB(callbacks.Plugin):
     def mlbpitcher(self, irc, msg, args, optteam):
         """<TEAM>
         Displays current pitcher(s) in game for a specific team.
+        Ex: NYY
         """
 
         # note: mlbpitcher is normally handled by another bot. only doing
