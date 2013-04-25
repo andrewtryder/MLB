@@ -460,7 +460,9 @@ class MLB(callbacks.Plugin):
             for row in rows:
                 player = row.getText()
                 playersplit = player.split(',', 1)  # split on last, first so we can reverse below.
-                player = "{0} {1}".format(playersplit[1].strip(), playersplit[0].strip())
+                p1 = playersplit[1].strip().encode('utf-8')
+                p2 = playersplit[0].strip().encode('utf-8')
+                player = "{0} {1}".format(p1, p2)
                 twoteamplayers.setdefault(bbteam.getText(), []).append(player)  # append.
 
         # now we need to pick the player(s)
