@@ -576,6 +576,9 @@ class MLB(callbacks.Plugin):
         Ex: NYY TOR
         """
 
+        # for the url and later.
+        currentYear = str(datetime.date.today().year)
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if optteam is 1:  # team is not found in aliases or validteams.
@@ -587,7 +590,7 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
         # fetch url.
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtcy9wcmludFNjaGVkdWxlL18vdGVhbQ==') + '/%s/season/%s' % (optteam, str(datetime.date.today().year))
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtcy9wcmludFNjaGVkdWxlL18vdGVhbQ==') + '/%s/season/%s' % (optteam, currentYear)
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -619,7 +622,7 @@ class MLB(callbacks.Plugin):
 
         if len(out_list) > 0:
             descstring = " | ".join([item for item in out_list])
-            output = "There are {0} games between {1} and {2} :: {3}".format(self._red(len(out_list)), self._bold(optteam), self._bold(optopp), descstring)
+            output = "There are {0} games remaining between {1} and {2} :: {3}".format(self._red(len(out_list)), self._bold(optteam), self._bold(optopp), descstring)
             irc.reply(output)
         else:
             irc.reply("I do not see any remaining games between: {0} and {1} in the {2} schedule.".format(self._bold(optteam), self._bold(optopp), currentYear))
