@@ -233,7 +233,7 @@ class MLB(callbacks.Plugin):
         # test for valid teams.
         optteam = self._validteams(optteam)
         if optteam is 1:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Must be one of: {0}".format(self._allteams()))
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         # build url and fetch scoreboard.
@@ -510,20 +510,21 @@ class MLB(callbacks.Plugin):
         Ex: NYY BOS
         """
 
-        optteam, optopp = optteam.upper(), optopp.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
-            return
-
-        if optopp not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
-            return
-
+        # first test for similarity.
         if optteam == optopp:
-            irc.reply("error: Must have different teams in mlbheadtohead")
+            irc.reply("ERROR: You must specify two different teams.")
             return
-
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # test for valid teams.
+        optopp = self._validteams(optopp)
+        if optopp is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvZ3JpZA==')
         html = self._httpget(url)
         if not html:
@@ -531,8 +532,8 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
 
+        # process html.
         html = html.replace('CHW', 'CWS')  # mangle this since.. it's there'
-
         soup = BeautifulSoup(html)
         tables = soup.findAll('table', attrs={'class':'tablehead'})  # two tables.
 
@@ -575,19 +576,18 @@ class MLB(callbacks.Plugin):
         Ex: NYY TOR
         """
 
-        optteam, optopp = optteam.upper(), optopp.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
-        if optopp not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optopp = self._validteams(optopp)
+        if optopp is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
-        currentYear = str(datetime.date.today().year) # need as a str.
-
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtcy9wcmludFNjaGVkdWxlL18vdGVhbQ==') + '/%s/season/%s' % (optteam, currentYear)
+        # fetch url.
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtcy9wcmludFNjaGVkdWxlL18vdGVhbQ==') + '/%s/season/%s' % (optteam, str(datetime.date.today().year))
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -639,30 +639,25 @@ class MLB(callbacks.Plugin):
             return
 
         soup = BeautifulSoup(html)
-        ejectedTotal = soup.find('div', attrs={'class':'sites-list-showing-items'}).find('span')
+        ejectedTotal = soup.find('div', attrs={'class':'sites-list-showing-items'}).find('span').getText()
         table = soup.find('table', attrs={'id':'goog-ws-list-table', 'class':'sites-table goog-ws-list-table'})
         rows = table.findAll('tr')[1:6]  # last 5. header row is 0.
 
         append_list = []
 
         for row in rows:
-            date = row.find('td')
-            number = date.findNext('td')
-            pnum = number.findNext('td')
-            mnum = pnum.findNext('td')
-            unum = mnum.findNext('td')
-            umppos = unum.findNext('td')
-            umpname = umppos.findNext('td')
-            ejteam = umpname.findNext('td')
-            ejpos = ejteam.findNext('td')
-            ejected = ejpos.findNext('td')
-            date = date.getText()
+            tds = row.findAll('td')
+            self.log.info(str(len(tds)))
+            date = tds[0].getText()
+            umpname = tds[4].getText()
+            ejteam = tds[5].getText()
+            #ejpos = tds[6].getText()
+            ejected = tds[7].getText()
             date = self._dtFormat('%m/%d', date, '%B %d, %Y') # March 27, 2013
-
-            append_list.append("{0} - {1} ejected {2} ({3})".format(date, umpname.getText(), ejected.getText(), ejpos.getText()))
+            append_list.append("{0} - {1} ejected {2} ({3})".format(date, umpname, ejected, ejteam))
 
         descstring = " | ".join([item for item in append_list])
-        irc.reply("There have been {0} ejections this season. Last five :: {1}".format(self._red(ejectedTotal.getText()), descstring))
+        irc.reply("There have been {0} ejections this season. Last five :: {1}".format(self._red(ejectedTotal), descstring))
 
     mlbejections = wrap(mlbejections)
 
