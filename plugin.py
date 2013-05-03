@@ -1919,21 +1919,17 @@ class MLB(callbacks.Plugin):
         Ex: NYY
         """
 
-        # without optdate and optteam, we only do a single day (today)
-        # with optdate and optteam, show only one date with one team
-        # with no optdate and optteam, show whatever the stuff today is.
-        # with optdate and no optteam, show all matches that day.
-
-        optteam = optteam.upper().strip()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
+        # put the next five dates in a list.
         dates = []
         date = datetime.date.today()
         dates.append(date)
-
+        # add the next four days.
         for i in range(4):
             date += datetime.timedelta(days=1)
             dates.append(date)
@@ -1941,11 +1937,16 @@ class MLB(callbacks.Plugin):
         out_array = []
 
         for eachdate in dates:
-            outdate = eachdate.strftime("%Y%m%d")
-            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3Byb2JhYmxlcz93amI9') + '&date=%s' % outdate
+            outdate = eachdate.strftime("%Y%m%d")  # date in YYYYmmDD
 
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read().replace("ind alt tL spaced", "ind tL spaced")
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3Byb2JhYmxlcz93amI9') + '&date=%s' % outdate
+            html = self._httpget(url)
+            if not html:
+                irc.reply("ERROR: Failed to fetch {0}.".format(url))
+                self.log.error("ERROR opening {0}".format(url))
+                return
+
+            html = html.replace("ind alt tL spaced", "ind tL spaced")
 
             if "No Games Scheduled" in html:
                 next
