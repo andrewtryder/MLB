@@ -40,3 +40,4 @@ CREATE TABLE mlbteamaliases (
 );
 /* EACH ALIAS IS INDIVIDUAL LINE. SOME TEAMS WILL HAVE MORE THAN OTHERS. */
 INSERT INTO mlbteamaliases (team, teamalias) values ('ARI','diamondbacks');
+INSERT INTO mlbteamaliases (team, teamalias) values ('DET','tigers');
