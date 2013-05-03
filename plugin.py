@@ -985,13 +985,14 @@ class MLB(callbacks.Plugin):
         Display payroll situation for <team>. Ex: NYY
         """
 
-        optteam = optteam.upper()
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
+        # need to translate team for the url
         lookupteam = self._translateTeam('st', 'team', optteam)
-
+        # fetch url.
         url = self._b64decode('aHR0cDovL3d3dy5zcG90cmFjLmNvbS9tbGIv') + '%s/team-payroll/' % lookupteam
         html = self._httpget(url)
         if not html:
@@ -1082,8 +1083,7 @@ class MLB(callbacks.Plugin):
         Display a list of valid teams for input.
         """
 
-        teams = self._validteams()
-        irc.reply("Valid MLB teams are: %s" % (" | ".join([item for item in teams])))
+        irc.reply("Valid MLB teams are: {0}".format(self._allteams()))
 
     mlbteams = wrap(mlbteams)
 
