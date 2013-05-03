@@ -810,8 +810,8 @@ class MLB(callbacks.Plugin):
         if optteam is 1:  # team is not found in aliases or validteams.
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
-        if optteam == 'CWS':  # didn't want a new table here for one site, so this is a cheap stop-gap.
+        # didn't want a new table here for one site, so this is a cheap stop-gap. must do this for urls.
+        if optteam == 'CWS':
             optteam = 'chw'
         else:
             optteam = optteam.lower()
@@ -836,7 +836,7 @@ class MLB(callbacks.Plugin):
             append_list.append("{0} {1}".format(self._bold(playerPos.getText()), playersList.getText()))
 
         descstring = " | ".join([item for item in append_list])
-        output = "{0} :: {1}".format(self._red(optteam.upper()), descstring)
+        output = "{0} (games by POS) :: {1}".format(self._red(optteam.upper()), descstring)
 
         irc.reply(output)
 
