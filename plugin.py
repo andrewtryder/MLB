@@ -849,10 +849,10 @@ class MLB(callbacks.Plugin):
         Ex: --40man NYY
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         active, fortyman = True, False
@@ -861,8 +861,8 @@ class MLB(callbacks.Plugin):
                 active, fortyman = True, False
             if option == '40man':
                 active, fortyman = False, True
-
-        if optteam == 'CWS':  # didn't want a new table here for one site, so this is a cheap stop-gap.
+        # didn't want a new table here for one site, so this is a cheap stop-gap. must do this for urls.
+        if optteam == 'CWS':
             optteam = 'chw'
         else:
             optteam = optteam.lower()
@@ -891,12 +891,12 @@ class MLB(callbacks.Plugin):
             playerPos = playerName.findNext('td')
             team_data[str(playerType.getText())].append("{0} ({1})".format(playerName.getText(), playerPos.getText()))
 
+        # output time.
         for i, j in team_data.iteritems():
             output = "{0} {1} :: {2}".format(self._red(optteam.upper()), self._bold(i), " | ".join([item for item in j]))
             irc.reply(output)
 
     mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
-
 
     def mlbrosterstats(self, irc, msg, args, optteam):
         """[team]
@@ -904,25 +904,25 @@ class MLB(callbacks.Plugin):
         Optionally, use TEAM as argument to display roster stats/averages for MLB team. Ex: NYY
         """
 
-        if optteam:
-            optteam = optteam.upper()
-            if optteam not in self._validteams():
-                irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        if optteam:  # if we want a specific team, validate it.
+            optteam = self._validteams(optteam)
+            if optteam is 1:  # team is not found in aliases or validteams.
+                irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
                 return
-
+        # fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9yb3N0ZXJz')
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
+        # process html.
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'class':'tablehead'})
         rows = table.findAll('tr')[2:]
-
+        # use a list to store our ordereddicts.
         object_list = []
-
+        # each row is a team.
         for row in rows:
             tds = row.findAll('td')
             team = tds[1].getText()
@@ -945,12 +945,13 @@ class MLB(callbacks.Plugin):
             d['data'] = aString
             object_list.append(d)
 
-        if optteam:
+        # output time.
+        if optteam:  # if we have a team, validated above, output them.
             for each in object_list:
                 if each['team'] == optteam:  # list will have all teams so we don't need to check
                     output = "{0} Roster Stats :: {1}".format(self._red(each['team']), each['data'])
             irc.reply(output)
-        else:
+        else:  # just show youngest and oldest.
             output = "{0} :: {1}".format(self._bold("5 Youngest MLB Teams:"), " | ".join([item['team'] for item in object_list[0:5]]))
             irc.reply(output)
 
