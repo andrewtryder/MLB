@@ -1054,7 +1054,6 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
 
-        #html = html.replace('&nbsp;',' ')
         soup = BeautifulSoup(html)
         table = soup.find('table', attrs={'id':'playertable_0'})
         rows = table.findAll('tr')[2:12]
@@ -1092,10 +1091,10 @@ class MLB(callbacks.Plugin):
         Display weather for MLB team at park they are playing at.
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         url = self._b64decode('aHR0cDovL3d3dy5wYXJrZmFjdG9ycy5jb20v')
@@ -1110,7 +1109,6 @@ class MLB(callbacks.Plugin):
             return
         # need to do some mangling.
         html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL')
-
         soup = BeautifulSoup(html)
         h3s = soup.findAll('h3')
 
@@ -1180,10 +1178,10 @@ class MLB(callbacks.Plugin):
         NOTE: Will only work closer toward the end of the season.
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
@@ -1242,7 +1240,7 @@ class MLB(callbacks.Plugin):
                 ol.append(self._bold(team.upper()))
 
         if len(ol) != 10:
-            irc.reply("I did not find playoff matchups. Check closer to playoffs.")
+            irc.reply("ERROR: I did not find playoff matchups. Check closer to playoffs.")
         else:
             irc.reply("Playoffs: AL ({0} vs {1}) vs. {2} | {3} vs. {4} || NL: ({5} vs. {6}) vs. {7} | {8} vs. {9}".format(\
                 ol[0], ol[1], ol[2], ol[3], ol[4], ol[5], ol[6], ol[7], ol[8], ol[9]))
@@ -1396,21 +1394,21 @@ class MLB(callbacks.Plugin):
         Ex: NYY
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
+        # translate team for url.
         lookupteam = self._translateTeam('yahoo', 'team', optteam) # (db, column, optteam)
-
+        # make and fetch url.
         url = self._b64decode('aHR0cDovL3Nwb3J0cy55YWhvby5jb20vbWxiL3RlYW1z') + '/%s/calendar/rss.xml' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
+        # sanity check.
         if "Schedule for" not in html:
             irc.reply("ERROR: Cannot find schedule. Broken url?")
             return
@@ -1451,10 +1449,10 @@ class MLB(callbacks.Plugin):
         Ex: NYY
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9tYW5hZ2Vycw==')
@@ -1587,10 +1585,10 @@ class MLB(callbacks.Plugin):
         Ex: NYY
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xpbmV1cHM/d2piPQ==')
@@ -1634,9 +1632,10 @@ class MLB(callbacks.Plugin):
             if option == 'details':
                 details = True
 
-        optteam = optteam.upper()
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         lookupteam = self._translateTeam('roto', 'team', optteam)
@@ -1650,9 +1649,8 @@ class MLB(callbacks.Plugin):
 
         soup = BeautifulSoup(html)
         # check if we have any injuries.
-        if soup.find('div', attrs={'class': 'player'}):
-            team = soup.find('div', attrs={'class': 'player'}).find('a').text
-        else:
+        if not soup.find('div', attrs={'class': 'player'}):
+            #team = soup.find('div', attrs={'class': 'player'}).find('a').text
             irc.reply("No injuries found for: %s" % optteam)
             return
         # if we do, find the table.
@@ -1743,13 +1741,13 @@ class MLB(callbacks.Plugin):
         Ex. NYY hr
         """
 
-        optteam = optteam.upper()
-        optcategory = optcategory.lower()
-
-        if optteam not in self._validteams():
-            irc.reply("ERROR: Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
+        optcategory = optcategory.lower()
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct',
                     'slug':'slugAvg', 'ops':'OPS', 'sb':'stolenBases', 'runscreated':'runsCreated',
                     'w': 'wins', 'l': 'losses', 'win%': 'winPct', 'era': 'ERA',  'k': 'strikeouts',
@@ -1831,20 +1829,20 @@ class MLB(callbacks.Plugin):
             append_list.append("{0}. {1} {2}".format(rank, team, num))
         # output
         thelist = " | ".join([item for item in append_list])
-        irc.reply("Leaders in %s for %s: %s" % (self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
+        irc.reply("Leaders in {0} for {1} :: {2}".format(self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
 
     mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbteamtrans(self, irc, msg, args, optteam):
-        """[team]
+        """<team>
         Shows recent MLB transactions for a team.
         Ex: NYY
         """
 
-        optteam = optteam.upper()
-
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
 
         lookupteam = self._translateTeam('eid', 'team', optteam)
@@ -1878,7 +1876,6 @@ class MLB(callbacks.Plugin):
 
         if optdate:
             try:
-                #time.strptime(optdate, '%Y%m%d') # test for valid date
                 datetime.datetime.strptime(optdate, '%Y%m%d')
             except:
                 irc.reply("ERROR: Date format must be in YYYYMMDD. Ex: 20120714")
@@ -1901,19 +1898,18 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html)
         t1 = soup.findAll('div', attrs={'class':re.compile('ind alt|ind')})
 
-        out_list = []
-
         if len(t1) < 1:
             irc.reply("ERROR: I did not find any MLB transactions for: {0}".format(optdate))
             return
-        for trans in t1:
+        else:
             irc.reply("Displaying all MLB transactions for: {0}".format(self._ul(optdate)))
-            if "<a href=" not in trans: # no links
-                match1 = re.search(r'<b>(.*?)</b><br />(.*?)</div>', str(trans), re.I|re.S) #strip out team and transaction
-                if match1:
-                    team = match1.group(1) # shorten here?
-                    transaction = match1.group(2)
-                    irc.reply("{0} - {1}".format(self._red(team), transaction))
+            for trans in t1:
+                if "<a href=" not in trans: # no links
+                    match1 = re.search(r'<b>(.*?)</b><br />(.*?)</div>', str(trans), re.I|re.S) #strip out team and transaction
+                    if match1:
+                        team = match1.group(1) # shorten here?
+                        transaction = match1.group(2)
+                        irc.reply("{0} - {1}".format(self._red(team), transaction))
 
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
 
