@@ -639,6 +639,7 @@ class MLB(callbacks.Plugin):
             return
 
         soup = BeautifulSoup(html)
+        ejectedTitle = soup.find('span', attrs={'id':'sites-page-title'}).getText()
         ejectedTotal = soup.find('div', attrs={'class':'sites-list-showing-items'}).find('span').getText()
         table = soup.find('table', attrs={'id':'goog-ws-list-table', 'class':'sites-table goog-ws-list-table'})
         rows = table.findAll('tr')[1:6]  # last 5. header row is 0.
@@ -647,7 +648,6 @@ class MLB(callbacks.Plugin):
 
         for row in rows:
             tds = row.findAll('td')
-            self.log.info(str(len(tds)))
             date = tds[0].getText()
             umpname = tds[4].getText()
             ejteam = tds[5].getText()
@@ -656,8 +656,8 @@ class MLB(callbacks.Plugin):
             date = self._dtFormat('%m/%d', date, '%B %d, %Y') # March 27, 2013
             append_list.append("{0} - {1} ejected {2} ({3})".format(date, umpname, ejected, ejteam))
 
-        descstring = " | ".join([item for item in append_list])
-        irc.reply("There have been {0} ejections this season. Last five :: {1}".format(self._red(ejectedTotal), descstring))
+        irc.reply("{0} :: {1} ejections this season.".format(self._bold(ejectedTitle), self._red(ejectedTotal)))
+        irc.reply(" | ".join([item for item in append_list]))
 
     mlbejections = wrap(mlbejections)
 
