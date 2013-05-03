@@ -164,37 +164,60 @@ class MLB(callbacks.Plugin):
 	# DATABASE FUNCTIONS #
 	######################
 
-    def _validteams(self):
-        """Returns a list of valid teams for input verification."""
+    def _allteams(self):
+        """Return a list of all valid teams (abbr)."""
 
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "select team from mlb"
             cursor.execute(query)
-            teamlist = []
-            for row in cursor.fetchall():
-                teamlist.append(str(row[0]))
+            teamlist = [item[0] for item in cursor.fetchall()]
 
-        return teamlist
+        return " | ".join(sorted(teamlist))
+
+    def _validteams(self, optteam):
+        """Takes optteam as input function and sees if it is a valid team.
+        Aliases are supported via mlbteamaliases table.
+        Returns a 1 upon error (no team name nor alias found.)
+        Returns the team's 3-letter (ex: NYY or ARI) if successful."""
+
+        with sqlite3.connect(self._mlbdb) as conn:
+            cursor = conn.cursor()
+            query = "select team from mlbteamaliases where teamalias LIKE ?"  # check aliases first.
+            cursor.execute(query, ('%'+optteam.lower()+'%',))
+            aliasrow = cursor.fetchone()  # this will be None or the team (NYY).
+            if not aliasrow:  # person looking for team.
+                query = "select team from mlb where team=?"
+                cursor.execute(query, (optteam.upper(),))  # standard lookup. go upper. nyy->NYY.
+                teamrow = cursor.fetchone()
+                if not teamrow:  # team is not found. Error.
+                    returnval = 1  # checked in each command.
+                else:  # ex: NYY
+                    returnval = str(teamrow[0])
+            else:  # alias turns into team like NYY.
+                returnval = str(aliasrow[0])
+        # return time.
+        return returnval
 
     def _translateTeam(self, db, column, optteam):
-        """Translates optteam into proper string using database"""
+        """Translates optteam (validated via _validteams) into proper string using database column."""
 
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "select %s from mlb where %s='%s'" % (db, column, optteam)
-            #self.log.info(query)
             cursor.execute(query)
             row = cursor.fetchone()
 
-            return (str(row[0]))
+        return (str(row[0]))
 
     ####################
     # PUBLIC FUNCTIONS #
     ####################
 
     def mlbcountdown(self, irc, msg, args):
-        """Display countdown until next MLB opening day."""
+        """
+        Display countdown until next MLB opening day.
+        """
 
         oDay = (datetime.datetime(2014, 03, 31) - datetime.datetime.now()).days
         irc.reply("{0} day(s) until 2014 MLB Opening Day.".format(oDay))
@@ -207,12 +230,12 @@ class MLB(callbacks.Plugin):
         Ex: NYY
         """
 
-        # note: mlbpitcher is normally handled by another bot. only doing
-        # this as a supplement until the original bot owner fixes it.
-        optteam = optteam.upper()
-        if optteam not in self._validteams():
-            irc.reply("Team not found. Must be one of: %s" % self._validteams())
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Must be one of: {0}".format(self._allteams()))
             return
+
         # build url and fetch scoreboard.
         url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
         html = self._httpget(url)
