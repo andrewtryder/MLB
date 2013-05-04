@@ -1590,15 +1590,14 @@ class MLB(callbacks.Plugin):
         if optteam is 1:  # team is not found in aliases or validteams.
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-
+        # create url and do work.
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xpbmV1cHM/d2piPQ==')
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
-        # have to do some replacing for the regex to work
+        # have to do some replacing for the regex to work. ugly but it works.
         html = html.replace('<b  >', '<b>').replace('<b>TAM</b>','<b>TB</b>').replace('<b>WAS</b>','<b>WSH</b>').replace('<b>CHW</b>','<b>CWS</b>')
         html = html.replace('<b>KAN</b>','<b>KC</b>').replace('<b>SDG</b>','<b>SD</b>').replace('<b>SFO</b>','<b>SF</b>')
 
@@ -1613,9 +1612,9 @@ class MLB(callbacks.Plugin):
         # output time.
         lineup = outdict.get(optteam)
         if lineup:
-            irc.reply("{0:5} - {1}".format(self._bold(optteam), lineup))
+            irc.reply("{0} lineup - {1}".format(self._red(optteam), lineup))
         else:
-            irc.reply("Could not find lineup for: {0}. Check closer to game time.".format(optteam))
+            irc.reply("ERROR: Could not find lineup for: {0}. Lineups will be available closer to game time.".format(optteam))
             return
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
