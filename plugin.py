@@ -1612,7 +1612,7 @@ class MLB(callbacks.Plugin):
         # output time.
         lineup = outdict.get(optteam)
         if lineup:
-            irc.reply("{0} lineup - {1}".format(self._red(optteam), lineup))
+            irc.reply("{0} lineup :: {1}".format(self._red(optteam), lineup))
         else:
             irc.reply("ERROR: Could not find lineup for: {0}. Lineups will be available closer to game time.".format(optteam))
             return
