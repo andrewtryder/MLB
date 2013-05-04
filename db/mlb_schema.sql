@@ -1,6 +1,16 @@
 /* MLB TEAMS */
-CREATE TABLE mlb (team text primary key, eid integer, roto text, fulltrans text, ename text, short text, yahoo text, eshort text, st text);
-/* ONE PER TEAM */
+CREATE TABLE mlb (
+    team TEXT PRIMARY KEY,
+    eid INTEGER,
+    roto TEXT,
+    fulltrans TEXT,
+    ename TEXT,
+    short TEXT,
+    yahoo TEXT,
+    eshort TEXT,
+    st TEXT
+);
+/* ONE ROW PER TEAM */
 INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st) values ('ARI','29','ARZ','Arizona Diamondbacks','Arizona','diamondbacks','ari','ari','arizona-diamondbacks');
 INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st) values ('ATL','15','ATL','Atlanta Braves','Atlanta','braves','atl','atl','atlanta-braves');
 INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st) values ('BAL','1','BAL','Baltimore Orioles','Baltimore','orioles','bal','bal','baltimore-orioles');
@@ -39,5 +49,11 @@ CREATE TABLE mlbteamaliases (
     FOREIGN KEY(team) REFERENCES mlb(team)
 );
 /* EACH ALIAS IS INDIVIDUAL LINE. SOME TEAMS WILL HAVE MORE THAN OTHERS. */
+INSERT INTO mlbteamaliases (team, teamalias) values ('ARI','arizona');
 INSERT INTO mlbteamaliases (team, teamalias) values ('ARI','diamondbacks');
+INSERT INTO mlbteamaliases (team, teamalias) values ('ARI','arz');
+INSERT INTO mlbteamaliases (team, teamalias) values ('ATL','braves');
+INSERT INTO mlbteamaliases (team, teamalias) values ('ATL','atlanta');
+INSERT INTO mlbteamaliases (team, teamalias) values ('BAL','baltimore');
+INSERT INTO mlbteamaliases (team, teamalias) values ('BAL','orioles');
 INSERT INTO mlbteamaliases (team, teamalias) values ('DET','tigers');
