@@ -15,7 +15,7 @@ import random
 import sqlite3
 from itertools import groupby, count
 import os
-import json
+import base64
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -124,22 +124,9 @@ class MLB(callbacks.Plugin):
             self.log.error("I could not open {0} error: {1}".format(url,e))
             return None
 
-    def _shortenUrl(self, url):
-        """Shortens a long URL into a short one."""
-
-        try:
-            posturi = "https://www.googleapis.com/urlshortener/v1/url"
-            data = json.dumps({'longUrl' : url})
-            request = urllib2.Request(posturi, data, {'Content-Type':'application/json'})
-            response = urllib2.urlopen(request)
-            return json.loads(response.read())['id']
-        except:
-            return url
-
     def _b64decode(self, string):
         """Returns base64 decoded string."""
 
-        import base64
         return base64.b64decode(string)
 
     def _dtFormat(self, outfmt, instring, infmt):
