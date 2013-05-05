@@ -170,8 +170,8 @@ class MLB(callbacks.Plugin):
 
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
-            query = "select team from mlbteamaliases where teamalias LIKE ?"  # check aliases first.
-            cursor.execute(query, ('%'+optteam.lower()+'%',))
+            query = "select team from mlbteamaliases where teamalias=?"  # check aliases first.
+            cursor.execute(query, (optteam.lower(),))
             aliasrow = cursor.fetchone()  # this will be None or the team (NYY).
             if not aliasrow:  # person looking for team.
                 query = "select team from mlb where team=?"
