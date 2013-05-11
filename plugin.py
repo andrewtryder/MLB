@@ -237,21 +237,14 @@ class MLB(callbacks.Plugin):
         playoffs = collections.defaultdict(list)
 
         for row in rows:
-            tds = row.findAll('td')
-            tds = [item.getText() for item in tds]  # save time/space doing this.
+            #tds = row.findAll('td')
+            tds = [item.getText() for item in row.findAll('td')]  # save time/space doing this.
             team = tds[0].lower()  # to match for translate team below.
-            team = self._translateTeam('team', 'playoffs', team)
-            playoffper = self._bold(tds[9])
-            winws = self._bold(tds[12])
-            seed1 = self._bold(tds[16])
-            seed2 = self._bold(tds[17])
-            seed3 = self._bold(tds[18])
-            seed4 = self._bold(tds[19])
-            seed5 = self._bold(tds[20])
-            rpi = self._bold(tds[32])
-            sos = self._bold(tds[33])
+            team = self._translateTeam('team', 'playoffs', team)  # translate to mate with optteam.
+            # make the string to append as value below.
             appendString = "make playoffs: {0} | win WS: {1} | % to obtain seed # :: 1. {2} 2. {3} 3. {4} 4. {5} 5. {6} | RPI: {7} | SOS: {8}".format(\
-                    playoffper, winws, seed1, seed2, seed3, seed4, seed5, rpi, sos)
+                    self._bold(tds[9]), self._bold(tds[12]), self._bold(tds[16]), self._bold(tds[17]), self._bold(tds[18]), self._bold(tds[19]),\
+                    self._bold(tds[20]), self._bold(tds[32]), self._bold(tds[33]))
             playoffs[team] = appendString
         # output time.
         output = playoffs.get(optteam)
