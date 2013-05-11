@@ -211,6 +211,58 @@ class MLB(callbacks.Plugin):
 
     mlbcountdown = wrap(mlbcountdown)
 
+    def mlbplayoffchances(self, irc, msg, args, optteam):
+        """<TEAM>
+        Display team's current playoff chances, ws chances, % to obtain seeds, RPI and SOS.
+        Ex: NYY
+        """
+
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if optteam is 1:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # build url and fetch.
+        url = self._b64decode('aHR0cDovL3d3dy5zcG9ydHNjbHVic3RhdHMuY29tL01MQi5odG1s')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
+        soup = BeautifulSoup(html)
+        table = soup.find('table', attrs={'id':'list'})
+        rows = table.findAll('tr', attrs={'class': re.compile('^team.*?')})
+
+        playoffs = collections.defaultdict(list)
+
+        for row in rows:
+            tds = row.findAll('td')
+            tds = [item.getText() for item in tds]  # save time/space doing this.
+            team = tds[0].lower()  # to match for translate team below.
+            team = self._translateTeam('team', 'playoffs', team)
+            playoffper = self._bold(tds[9])
+            winws = self._bold(tds[12])
+            seed1 = self._bold(tds[16])
+            seed2 = self._bold(tds[17])
+            seed3 = self._bold(tds[18])
+            seed4 = self._bold(tds[19])
+            seed5 = self._bold(tds[20])
+            rpi = self._bold(tds[32])
+            sos = self._bold(tds[33])
+            appendString = "make playoffs: {0} | win WS: {1} | % to obtain seed # :: 1. {2} 2. {3} 3. {4} 4. {5} 5. {6} | RPI: {7} | SOS: {8}".format(\
+                    playoffper, winws, seed1, seed2, seed3, seed4, seed5, rpi, sos)
+            playoffs[team] = appendString
+        # output time.
+        output = playoffs.get(optteam)
+        if not output:
+            irc.reply("ERROR: I could not find playoff stats for: {0}.".format(optteam))
+            return
+        else:  # if we find it.
+            irc.reply("{0} chances :: {1}".format(self._red(optteam), output))
+
+    mlbplayoffchances = wrap(mlbplayoffchances, [('somethingWithoutSpaces')])
+
     def mlbpitcher(self, irc, msg, args, optteam):
         """<TEAM>
         Displays current pitcher(s) in game for a specific team.
