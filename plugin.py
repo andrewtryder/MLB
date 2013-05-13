@@ -538,14 +538,10 @@ class MLB(callbacks.Plugin):
 
     def mlbheadtohead(self, irc, msg, args, optteam, optopp):
         """<team> <opp>
-        Display the record between two teams head-to-head. EX: NYY BOS
+        Display the record between two teams head-to-head.
         Ex: NYY BOS
         """
 
-        # first test for similarity.
-        if optteam == optopp:
-            irc.reply("ERROR: You must specify two different teams.")
-            return
         # test for valid teams.
         optteam = self._validteams(optteam)
         if optteam is 1:  # team is not found in aliases or validteams.
@@ -556,49 +552,57 @@ class MLB(callbacks.Plugin):
         if optopp is 1:  # team is not found in aliases or validteams.
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
+        # test for similarity
+        if optteam == optopp:
+            irc.reply("ERROR: You must specify two different teams.")
+            return
+
         # fetch url.
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvZ3JpZA==')
+        teamString = self._translateTeam('cbs', 'team', optteam)  # need cbs string for team. must be uppercase.
+        url = self._b64decode('aHR0cDovL3d3dy5jYnNzcG9ydHMuY29tL21sYi90ZWFtcy9zY2hlZHVsZQ==') + '/%s/' % teamString.upper()
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
         # process html.
-        html = html.replace('CHW', 'CWS')  # mangle this since.. it's there'
         soup = BeautifulSoup(html)
-        tables = soup.findAll('table', attrs={'class':'tablehead'})  # two tables.
-
-        headToHead = collections.defaultdict(list)
-
-        for table in tables:
-            rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')})
-            for i,row in enumerate(rows):  # each rows now.
-                header = row.findPrevious('tr', attrs={'class':'colhead'}).findAll('td')
-                team = row.findAll('td')[0]
-                tds = row.findAll('td')[1:]
-                for j,td in enumerate(tds):
-                    keyString = str(team.getText() + header[j+1].getText())  # key using team+header[j] text since vs. is in it. +1 due to tds being moved [1:]
-                    headToHead[keyString].append(str(td.getText()))
-
-        output = headToHead.get(str(optteam + "vs." + optopp), None)  # need to format w/ vs. here to match the key.
-
-        if output:
-            if output is not "--":
-                recordSplit = "".join(output).split('-')
-                win, loss = recordSplit[0], recordSplit[1]  # It is defined as wins divided by wins plus losses (i.e. — the total number of matches)
-                if win.isdigit() and loss.isdigit():
-                    if win == "0" and loss == "0":  # this prevents division by 0.
-                        percentage = "0.0"
-                    else:  # we don't have both zeros.
-                        percentage = ("%.3f" % (float(win) / float(int(win)+int(loss))))  # win percentage, limit to 3 precision
-                    irc.reply("Head-to-head record :: {0} vs. {1} :: {2} ({3})".format(self._bold(optteam), ircutils.bold(optopp), "".join(output), percentage))
-                else:
-                    irc.reply("Head-to-head record :: {0} vs. {1} :: {2}".format(self._bold(optteam), self._bold(optopp), "".join(output)))
-            else:
-                irc.reply("Head-to-head record :: {0} vs. {1} :: {2}".format(self._bold(optteam), self._bold(optopp), "".join(output)))
-        else:
-            irc.reply("Head-to-head record not found for {0} vs. {1}".format(self._bold(optteam), self._bold(optopp)))
+        table = soup.findAll('table', attrs={'class':'data'})[1]
+        rows = table.findAll('tr', attrs={'class': re.compile('^row.*?')})
+        # container for output.
+        winloss = {}
+        for row in rows:  # one per game.
+            tds = row.findAll('td')
+            date = tds[0].getText().replace('  ', ' ').strip()
+            # vsorat = if tds[1].getText().startswith('@')  # determine if it's vs. or @.
+            oppteam = tds[1].find('a')['href'].split('/')[4]  # find opp in / / href.
+            oppteam = self._translateTeam('team', 'cbs', oppteam.lower())  # translate to mate with optteam. must be lower.
+            wl = tds[2].getText().replace('  ', ' ').strip()
+            # we need a win or loss since PPD = useless/played later so we skip.
+            if wl.startswith('Lost') or wl.startswith('Won'):
+                wldict = {}  # dict for values.
+                if wl.startswith('Lost'):
+                    wldict['winloss'] = 'L'
+                elif wl.startswith('Won'):
+                    wldict['winloss'] = 'W'
+                wldict['date'] = date
+                wldict['score'] = wl.replace('Lost', 'L').replace('Won', 'W')  # some translation for output.
+                winloss.setdefault(oppteam, []).append(wldict)  # now add it all.
+        # small sanity check here.
+        if len(winloss) == 0:
+            irc.reply("ERROR: I have not found any played games for: {0}".format(optteam))
+            return
+        ## output time.
+        output = winloss.get(optopp, None)  # key is opponent's team.
+        if not output:
+            irc.reply("ERROR: I did not find any games between {0} and {1}.".format(optteam, optopp))
+            return
+        else:  # we do have a team/games.
+            wins = self._bold(len([item for item in output if item['winloss'] == "W"]))  # count wins, bold.
+            losses = self._bold(len([item for item in output if item['winloss'] == "L"]))  # count losses, bold.
+            games = " | ".join([item['date'] + ", " + item['score'] for item in output])
+            outstring = "{0} vs {1} {2}-{3} | {4}".format(self._red(optteam), self._red(optopp), wins, losses, games)
+            irc.reply(outstring)
 
     mlbheadtohead = wrap(mlbheadtohead, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
