@@ -556,7 +556,6 @@ class MLB(callbacks.Plugin):
         if optteam == optopp:
             irc.reply("ERROR: You must specify two different teams.")
             return
-
         # fetch url.
         teamString = self._translateTeam('cbs', 'team', optteam)  # need cbs string for team. must be uppercase.
         url = self._b64decode('aHR0cDovL3d3dy5jYnNzcG9ydHMuY29tL21sYi90ZWFtcy9zY2hlZHVsZQ==') + '/%s/' % teamString.upper()
@@ -573,11 +572,14 @@ class MLB(callbacks.Plugin):
         winloss = {}
         for row in rows:  # one per game.
             tds = row.findAll('td')
-            date = tds[0].getText().replace('  ', ' ').strip()
-            # vsorat = if tds[1].getText().startswith('@')  # determine if it's vs. or @.
+            date = tds[0].getText().replace('  ', ' ').strip()  # trans date.
+            if tds[1].getText().startswith('@'):  # vs or @ team.
+                vsorat = "@"
+            else:
+                vsorat = "vs. "
             oppteam = tds[1].find('a')['href'].split('/')[4]  # find opp in / / href.
             oppteam = self._translateTeam('team', 'cbs', oppteam.lower())  # translate to mate with optteam. must be lower.
-            wl = tds[2].getText().replace('  ', ' ').strip()
+            wl = tds[2].getText().replace('  ', ' ').strip()  # score here, remove doublespace.
             # we need a win or loss since PPD = useless/played later so we skip.
             if wl.startswith('Lost') or wl.startswith('Won'):
                 wldict = {}  # dict for values.
@@ -586,21 +588,22 @@ class MLB(callbacks.Plugin):
                 elif wl.startswith('Won'):
                     wldict['winloss'] = 'W'
                 wldict['date'] = date
+                wldict['vsorat'] = vsorat
                 wldict['score'] = wl.replace('Lost', 'L').replace('Won', 'W')  # some translation for output.
                 winloss.setdefault(oppteam, []).append(wldict)  # now add it all.
         # small sanity check here.
         if len(winloss) == 0:
             irc.reply("ERROR: I have not found any played games for: {0}".format(optteam))
             return
-        ## output time.
+        # output time.
         output = winloss.get(optopp, None)  # key is opponent's team.
-        if not output:
+        if not output:  # team did not play any games vs opp.
             irc.reply("ERROR: I did not find any games between {0} and {1}.".format(optteam, optopp))
             return
         else:  # we do have a team/games.
             wins = self._bold(len([item for item in output if item['winloss'] == "W"]))  # count wins, bold.
             losses = self._bold(len([item for item in output if item['winloss'] == "L"]))  # count losses, bold.
-            games = " | ".join([item['date'] + ", " + item['score'] for item in output])
+            games = " | ".join([item['date'] + ", " + item['vsorat'] + optopp + " " + item['score'] for item in output])
             outstring = "{0} vs {1} {2}-{3} | {4}".format(self._red(optteam), self._red(optopp), wins, losses, games)
             irc.reply(outstring)
 
