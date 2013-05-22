@@ -783,7 +783,7 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html)
         # first parse the searchpage for the smartcard.
         if not soup.find('li', attrs={'class':'result mod-smart-card'}):  # didn't find the smartcard.
-            irc.reply("ERROR: I didn't find a link for: {0}. Perhaps you should be more specific and give a full playername".format(optplayer))
+            irc.reply("ERROR: I didn't find a link for: {0}. This only works for MLB players and you might need to be more specific".format(optplayer))
             return
         playercard = soup.find('li', attrs={'class':'result mod-smart-card'})
         # for the rare occurences, check the url because we need a link to follow.
@@ -824,12 +824,17 @@ class MLB(callbacks.Plugin):
                 irc.reply("{0} :: {1}".format(playerName, " | ".join([item for item in outyear])))
         else:  # career stats not for a specific year.
             endrows = table.findAll('tr', attrs={'class':re.compile('^evenrow bi$|^oddrow bi$')})
+            totals, seasonaverages = None, None
             for total in endrows:
                 if total.find('td', text="Total"):
                     totals = total.findAll('td')
                 if total.find('td', text="Season Averages"):
                     seasonaverages = total.findAll('td')
-            # remove the first td, but match up header via j+2
+            # sometimes, the player is too new for totals/seasonaverages. bailout.
+            if not totals and not seasonaverages:
+                irc.reply("ERROR: I could not find totals and seasonaverages for: {0}. Perhaps the player is too new?".format(playerName))
+                return
+            # if we are set, remove the first td, but match up header via j+2
             del seasonaverages[0]
             del totals[0:2]
             # do the averages for output.
