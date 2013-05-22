@@ -754,58 +754,62 @@ class MLB(callbacks.Plugin):
 
     def mlbstats(self, irc, msg, args, optlist, optplayer):
         """<--year YYYY> [player name]
-        Display career totals and season averages for player. If --year YYYY is
-        specified, it will display the season stats for that player, if available.
-        NOTE: This command is intended for retired/inactive players, not active ones.
+        Display career totals and season averages for player.
+        Specify --year YYYY for specific year vs career stats.
+        Ex: Don Mattingly
         """
 
-        (first, last) = optplayer.split(" ", 1)  # playername needs to be "first-last".
-        searchplayer = first + '-' + last  # reconstruct here.
-
+        # we have to split the input because of how search is done.
+        pnsplit = optplayer.split(' ', 1) # first, last(everything else)
+        if len(pnsplit) is not 2:
+            irc.reply("ERROR: You must give FIRST and LAST name in search. Ex: Don Mattingly")
+            return
+        # reconstruct it here.
+        # searchplayer = "{0}-{1}".format(firstn, lastn) # reconstruct here.
+        # handle getopts (optinput)
         optyear = False
-        for (option, arg) in optlist:
-            if option == 'year':
-                optyear = arg
-
-        url = self._b64decode('aHR0cDovL3NlYXJjaC5lc3BuLmdvLmNvbS8=') + '%s' % searchplayer
+        if optlist:
+            for (option, arg) in optlist:
+                if option == 'year':
+                    optyear = arg
+        # build and fetch url.
+        url = self._b64decode('aHR0cDovL3NlYXJjaC5lc3BuLmdvLmNvbS8=') + "%s-%s" % (pnsplit[0], pnsplit[1])
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
-        # first parse the searchpage.
+        # process html.
         soup = BeautifulSoup(html)
-        if not soup.find('li', attrs={'class':'result mod-smart-card'}):
+        # first parse the searchpage for the smartcard.
+        if not soup.find('li', attrs={'class':'result mod-smart-card'}):  # didn't find the smartcard.
             irc.reply("ERROR: I didn't find a link for: {0}. Perhaps you should be more specific and give a full playername".format(optplayer))
             return
-        else:
-            playercard = soup.find('li', attrs={'class':'result mod-smart-card'})
-        # for the rare occurences, check the url.
-        if 'http://espn.go.com/mlb/players/stats?playerId=' not in playercard.renderContents():
+        playercard = soup.find('li', attrs={'class':'result mod-smart-card'})
+        # for the rare occurences, check the url because we need a link to follow.
+        if '/mlb/players/stats?playerId=' not in playercard.renderContents():
             irc.reply("ERROR: Could not find a link to career stats for: {0}".format(optplayer))
             return
-        else:  # need the link so we can follow.
-            url = playercard.find('a', attrs={'href':re.compile('.*?espn.go.com/mlb/players/stats.*?')})['href']
+        url = playercard.find('a', attrs={'href':re.compile('.*?/mlb/players/stats.*?')})['href']
         # make sure we have the link and fetch.
-        if not url:
+        if not url:  # no link found.
             irc.reply("ERROR: I didn't find the link I needed for career stats. Did something break?")
             return
-        else:
-            html = self._httpget(url)
-            if not html:
-                irc.reply("ERROR: Failed to fetch {0}.".format(url))
-                self.log.error("ERROR opening {0}".format(url))
-                return
-        # now parse the player's career page.
+        # we do have the link so lets refetch.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # now parse html the player's career page.
         soup = BeautifulSoup(html)
-        playerName = soup.find('div', attrs={'class':'player-bio'}).find('h1').getText()  # playerName.
-        table = soup.find('table', attrs={'class':'tablehead'}) # everything stems from the table.
-        header = table.find('tr', attrs={'class':'colhead'}).findAll('td') # columns to reference.
-
-        if optyear:
-            seasonrows = table.findAll('tr', attrs={'class':re.compile('^oddrow$|^evenrow$')}) # find all outside the season+totals
-            season_data = collections.defaultdict(list) # key will be the year.
+        playerName = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()  # playerName.
+        table = soup.find('table', attrs={'class':'tablehead'})  # everything stems from the table.
+        header = table.find('tr', attrs={'class':'colhead'}).findAll('td')  # columns to reference.
+        # process html differently, depending on if we have optyear or not.
+        if optyear:  # we have optyear. show specific year stats.
+            seasonrows = table.findAll('tr', attrs={'class':re.compile('^oddrow$|^evenrow$')})  # find all outside the season+totals
+            season_data = collections.defaultdict(list)  # key will be the year.
 
             for row in seasonrows:
                 tds = row.findAll('td')
@@ -817,25 +821,23 @@ class MLB(callbacks.Plugin):
             if not outyear:
                 irc.reply("ERROR: No stats found for {0} in {1}".format(playerName, optyear))
             else:
-                outyear = " | ".join([item for item in outyear])
-                irc.reply("{0} :: {1}".format(playerName, outyear))
+                irc.reply("{0} :: {1}".format(playerName, " | ".join([item for item in outyear])))
         else:  # career stats not for a specific year.
             endrows = table.findAll('tr', attrs={'class':re.compile('^evenrow bi$|^oddrow bi$')})
-
             for total in endrows:
                 if total.find('td', text="Total"):
                     totals = total.findAll('td')
                 if total.find('td', text="Season Averages"):
                     seasonaverages = total.findAll('td')
-            #remove the first td, but match up header via j+2
+            # remove the first td, but match up header via j+2
             del seasonaverages[0]
             del totals[0:2]
             # do the averages for output.
-            seasonstring = " | ".join([self._bold(header[i+2].getText()) + ": " + td.getText() for i,td in enumerate(seasonaverages)])
-            totalstring = " | ".join([self._bold(header[i+2].getText()) + ": " + td.getText() for i,td in enumerate(totals)])
+            seasonstring = " | ".join([self._bold(header[i+2].getText()) + ": " + td.getText() for i, td in enumerate(seasonaverages)])
+            totalstring = " | ".join([self._bold(header[i+2].getText()) + ": " + td.getText() for i, td in enumerate(totals)])
             # output time.
-            irc.reply("{0} Season Averages :: {1}".format(self._red(playerName), seasonstring))
-            irc.reply("{0} Career Totals :: {1}".format(self._red(playerName), totalstring))
+            irc.reply("{0} :: Season Averages :: {1}".format(self._red(playerName), seasonstring))
+            irc.reply("{0} :: Career Totals :: {1}".format(self._red(playerName), totalstring))
 
     mlbstats = wrap(mlbstats, [(getopts({'year':('int')})), ('text')])
 
