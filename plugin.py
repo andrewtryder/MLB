@@ -1549,15 +1549,15 @@ class MLB(callbacks.Plugin):
             if option == 'vsdivision':
                 vsdivision = True
         # now check optdiv for the division.
-        optdiv = optdiv.lower() # lower to match keys. values are in the table to match with the html.
-        leaguetable =   {'ale': 'American League EAST',
-                         'alc': 'American League CENTRAL',
-                         'alw': 'American League WEST',
-                         'nle': 'National League EAST',
-                         'nlc': 'National League CENTRAL',
-                         'nlw': 'National League WEST' }
+        optdiv = optdiv.upper() # lower to match keys. values are in the table to match with the html.
+        leaguetable =   {'ALE': 'American League EAST',
+                         'ALC': 'American League CENTRAL',
+                         'ALW': 'American League WEST',
+                         'NLE': 'National League EAST',
+                         'NLC': 'National League CENTRAL',
+                         'NLW': 'National League WEST' }
         if optdiv not in leaguetable:  # make sure keys are present.
-            irc.reply("ERROR: League must be one of: {0}".format(sorted(leaguetable.keys())))
+            irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
             return
 
         # build and fetch url. diff urls depending on option.
@@ -1613,7 +1613,7 @@ class MLB(callbacks.Plugin):
                 divstr = "#{0} {1} {2}-{3} {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB'])
                 divstandings.append(divstr)  # append.
             # now output the short.
-            irc.reply("{0} standings :: {1}".format(self._red(optdiv.upper()), " | ".join(divstandings)))
+            irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(divstandings)))
         else:  # display full rankings.
             for i, each in enumerate(object_list):
                 if i == 0: # to print the duplicate but only output the header of the table.
