@@ -1533,97 +1533,104 @@ class MLB(callbacks.Plugin):
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
-        """[--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW>
+        """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW>
         Display divisional standings for a division.
-        Use --expanded or --vsdivision to show extended stats.
-        Ex: --expanded ALC
+        Use --full or --expanded or --vsdivision to show extended stats.
+        Ex: --full ALC or --expanded ALE.
         """
 
-        expanded, vsdivision = False, False
+        # first, check getopts for what to display.
+        full, expanded, vsdivision = False, False, False
         for (option, arg) in optlist:
+            if option == 'full':
+                full = True
             if option == 'expanded':
                 expanded = True
             if option == 'vsdivision':
                 vsdivision = True
-
+        # now check optdiv for the division.
         optdiv = optdiv.lower() # lower to match keys. values are in the table to match with the html.
-
-        leaguetable =   {
-                            'ale': 'American League EAST',
-                            'alc': 'American League CENTRAL',
-                            'alw': 'American League WEST',
-                            'nle': 'National League EAST',
-                            'nlc': 'National League CENTRAL',
-                            'nlw': 'National League WEST'
-                        }
-
-        if optdiv not in leaguetable:
-            irc.reply("ERROR: League must be one of: %s" % leaguetable.keys())
+        leaguetable =   {'ale': 'American League EAST',
+                         'alc': 'American League CENTRAL',
+                         'alw': 'American League WEST',
+                         'nle': 'National League EAST',
+                         'nlc': 'National League CENTRAL',
+                         'nlw': 'National League WEST' }
+        if optdiv not in leaguetable:  # make sure keys are present.
+            irc.reply("ERROR: League must be one of: {0}".format(sorted(leaguetable.keys())))
             return
 
-        # diff urls depending on option.
+        # build and fetch url. diff urls depending on option.
         if expanded:
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL2V4cGFuZGVk')
         elif vsdivision:
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3ZzLWRpdmlzaW9u')
         else:
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3M=')
-
         # now fetch url.
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-
+        # process html.
         soup = BeautifulSoup(html) # one of these below will break if formatting changes.
         div = soup.find('div', attrs={'class':'mod-container mod-table mod-no-header'}) # div has all
         table = div.find('table', attrs={'class':'tablehead'}) # table in there
         rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')}) # rows are each team
-
-        object_list = [] # list for ordereddict with each entry.
-        lengthlist = collections.defaultdict(list) # sep data structure to determine length.
-
-        for row in rows: # this way, we don't need 100 lines to match with each column. works with multi length.
+        # list to hold our defaultdicts.
+        object_list = []
+        lengthlist = collections.defaultdict(list)  # sep data structure to determine length.
+        # each row is something in the standings.
+        for row in rows:
             league = row.findPrevious('tr', attrs={'class':'stathead'})
             header = row.findPrevious('tr', attrs={'class':'colhead'}).findAll('td')
             tds = row.findAll('td')
-
+            # we shove each row (team) into an OD.
             d = collections.OrderedDict()
-            division = str(league.getText() + " " + header[0].getText())
-
+            division = "{0} {1}".format(league.getText(), header[0].getText())
+            # only inject what we need
             if division == leaguetable[optdiv]: # from table above. only match what we need.
-                for i,td in enumerate(tds):
+                for i, td in enumerate(tds):
                     if i == 0: # manual replace of team here because the column doesn't say team.
-                        d['TEAM'] = str(tds[0].getText())
-                        lengthlist['TEAM'].append(len(str(tds[0].getText())))
+                        d['TEAM'] = tds[0].getText()
+                        lengthlist['TEAM'].append(len(tds[0].getText()))
                     else:
-                        d[str(header[i].getText())] = str(td.getText()).replace('  ',' ') # add to ordereddict + conv multispace to one.
-                        lengthlist[str(header[i].getText())].append(len(str(td.getText()))) # add key based on header, length of string.
-                object_list.append(d)
-
-        if len(object_list) > 0: # now that object_list should have entries, sanity check.
-            object_list.insert(0,object_list[0]) # cheap way to copy first item again because we iterate over it for header.
-        else: # bailout if something broke.
+                        d[header[i].getText()] = td.getText().replace('  ',' ') # add to ordereddict + conv multispace to one.
+                        lengthlist[header[i].getText()].append(len(td.getText())) # add key based on header, length of string.
+                object_list.append(d)  # append OD to list.
+        # partial sanity check but more of a cheap copy because of how we output.
+        if len(object_list) > 0:
+            object_list.insert(0,object_list[0])  # copy first item again.
+        else: # bailout if something broke but most likely did above.
             irc.reply("ERROR: Something broke returning mlbstandings.")
             return
+        # now prepare to output.
+        self.log.info(str(object_list))
+        if not full and not expanded and not vsdivision:  # display short.
+            divstandings = []  # list for output.
+            for i, each in enumerate(object_list[1:]):  # skip the first since its the header. iterate through to format+append.
+                divstr = "#{0} {1} {2}-{3} {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB'])
+                divstandings.append(divstr)  # append.
+            # now output the short.
+            irc.reply("{0} standings :: {1}".format(self._red(optdiv.upper()), " | ".join(divstandings)))
+        else:  # display full rankings.
+            for i, each in enumerate(object_list):
+                if i == 0: # to print the duplicate but only output the header of the table.
+                    headerOut = ""
+                    for keys in each.keys(): # only keys on the first list entry, a dummy/clone.
+                        headerOut += "{0:{1}}".format(self._ul(keys), max(lengthlist[keys])+4, key=int) # normal +2 but bold eats up +2 more, so +4.
+                    irc.reply(headerOut)  # output header.
+                else: # print the division now.
+                    tableRow = ""  # empty string we += to with each "row".
+                    for inum, k in enumerate(each.keys()):
+                        if inum == 0:  # team here, which we want to bold.
+                            tableRow += "{0:{1}}".format(self._bold(each[k]),max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
+                        else:  # rest of the elements outside the team.
+                            tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
+                    irc.reply(tableRow)
 
-        for i,each in enumerate(object_list):
-            if i == 0: # to print the duplicate but only output the header of the table.
-                headerOut = ""
-                for keys in each.keys(): # only keys on the first list entry, a dummy/clone.
-                    headerOut += "{0:{1}}".format(self._ul(keys),max(lengthlist[keys])+4, key=int) # normal +2 but bold eats up +2 more, so +4.
-                irc.reply(headerOut)
-            else: # print the division now.
-                tableRow = ""
-                for inum,k in enumerate(each.keys()):
-                    if inum == 0: # team here, which we want to bold.
-                        tableRow += "{0:{1}}".format(self._bold(each[k]),max(lengthlist[k])+4, key=int) #+4 since bold eats +2.
-                    else: # rest of the elements outside the team.
-                        tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
-                irc.reply(tableRow)
-
-    mlbstandings = wrap(mlbstandings, [getopts({'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
+    mlbstandings = wrap(mlbstandings, [getopts({'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
 
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
