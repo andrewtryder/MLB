@@ -243,7 +243,7 @@ class MLB(callbacks.Plugin):
             users.remove(a)  # remove so its unique. append below.
             lineup.append("{0}{1}".format(self._bold(a), position))
         # now output.
-        irc.reply("{0} LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
+        irc.reply("{0} ALL-STAR LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
 
     mlbchanlineup = wrap(mlbchanlineup)
 
