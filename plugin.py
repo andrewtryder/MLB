@@ -221,6 +221,32 @@ class MLB(callbacks.Plugin):
 
     mlbteams = wrap(mlbteams)
 
+    def mlbchanlineup(self, irc, msg, args):
+        """
+        Display a random lineup for channel users.
+        """
+
+        if not ircutils.isChannel(msg.args[0]):  # make sure its run in a channel.
+            irc.reply("ERROR: Must be run from a channel.")
+            return
+        # now make sure we have more than 9 users.
+        users = [i for i in irc.state.channels[msg.args[0]].users]
+        if len(users) < 9:  # need >9 users.
+            irc.reply("Sorry, I can only run this in a channel with more than 9 users.")
+            return
+        # now that we're good..
+        positions = (['(SS)', '(CF)', '(2B)', '(RF)', '(DH)', '(C)', '(1B)', '(3B)', '(LF)'])
+        random.shuffle(positions)  # shuffle.
+        lineup = []  # list for output.
+        for position in positions:  # iterate through and highlight.
+            a = random.choice(users)  # pick a random user.
+            users.remove(a)  # remove so its unique. append below.
+            lineup.append("{0}{1}".format(a, position))
+        # now output.
+        irc.reply("{0} LINEUP :: {1}".format(msg.args[0], ", ".join(lineup)))
+
+    mlbchanlineup = wrap(mlbchanlineup)
+
     def mlbplayoffchances(self, irc, msg, args, optteam):
         """<team>
         Display team's current playoff chances, ws chances, % to obtain seeds, RPI and SOS.
