@@ -241,9 +241,9 @@ class MLB(callbacks.Plugin):
         for position in positions:  # iterate through and highlight.
             a = random.choice(users)  # pick a random user.
             users.remove(a)  # remove so its unique. append below.
-            lineup.append("{0}{1}".format(a, position))
+            lineup.append("{0}{1}".format(self._bold(a), position))
         # now output.
-        irc.reply("{0} LINEUP :: {1}".format(msg.args[0], ", ".join(lineup)))
+        irc.reply("{0} LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
 
     mlbchanlineup = wrap(mlbchanlineup)
 
