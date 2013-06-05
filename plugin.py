@@ -14,7 +14,7 @@ import random
 import sqlite3
 from itertools import groupby, count
 import os
-import base64
+from base64 import b64decode
 # supybot libs.
 import supybot.utils as utils
 from supybot.commands import *
@@ -126,7 +126,7 @@ class MLB(callbacks.Plugin):
     def _b64decode(self, string):
         """Returns base64 decoded string."""
 
-        return base64.b64decode(string)
+        return b64decode(string)
 
     def _dtFormat(self, outfmt, instring, infmt):
         """Convert from one dateformat to another."""
@@ -246,6 +246,41 @@ class MLB(callbacks.Plugin):
         irc.reply("{0} ALL-STAR LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
 
     mlbchanlineup = wrap(mlbchanlineup)
+
+    def mlbstreaks(self, irc, msg, args):
+        """
+        Display this year's longest hitstreaks.
+        """
+
+        # build and fetch url.
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9oaXR0aW5nc3RyZWFrcw==')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        title = soup.find('h1', attrs={'class':'h2'}).getText()
+        div = soup.find('div', attrs={'id':'my-players-table'})
+        table = div.find('table', attrs={'class':'tablehead'})
+        rows = table.findAll('tr', attrs={'class':re.compile('(odd|even)row.*')})
+        # container for output.
+        mlbstreaks = collections.defaultdict(list)
+        # each row is a player. stathead has league.
+        for row in rows:
+            league = row.findPrevious('tr', attrs={'class':'stathead'})
+            tds = [item.getText() for item in row.findAll('td')]
+            player = tds[0]
+            streak = tds[2].strip(' games')
+            mlbstreaks[league.getText()].append("{0} ({1})".format(player, streak))
+        # output now.
+        irc.reply("{0}".format(self._blue(title)))
+        for i, x in mlbstreaks.items():
+            irc.reply("{0} :: {1}".format(self._bold(i), " | ".join(x)))
+
+    mlbstreaks = wrap(mlbstreaks)
+
 
     def mlbplayoffchances(self, irc, msg, args, optteam):
         """<team>
