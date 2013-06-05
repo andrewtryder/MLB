@@ -281,7 +281,6 @@ class MLB(callbacks.Plugin):
 
     mlbstreaks = wrap(mlbstreaks)
 
-
     def mlbplayoffchances(self, irc, msg, args, optteam):
         """<team>
         Display team's current playoff chances, ws chances, % to obtain seeds, RPI and SOS.
@@ -1256,40 +1255,42 @@ class MLB(callbacks.Plugin):
 
     mlbremaining = wrap(mlbremaining, [('somethingWithoutSpaces')])
 
-    def mlbplayoffs(self, irc, msg, args):
-        """
+    def mlbplayoffs(self, irc, msg, args, optleague):
+        """<AL|NL>
         Display playoff matchups if season ended today.
         """
 
+        # validate league for url.
+        optleague = optleague.upper()
+        if optleague == "AL":
+            url = b64decode('aHR0cDovL3d3dy5wbGF5b2Zmc3RhdHVzLmNvbS9tbGIvYW1lcmljYW5zdGFuZGluZ3MuaHRtbA==')
+        elif optleague == "NL":
+            url = b64decode('aHR0cDovL3d3dy5wbGF5b2Zmc3RhdHVzLmNvbS9tbGIvbmF0aW9uYWxzdGFuZGluZ3MuaHRtbA==')
+        else:
+            irc.reply("ERROR: league must be AL or NL.")
+            return
         # build and fetch url.
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9odW50Zm9yb2N0b2Jlcg==')
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
-        html = html.replace('sdg', 'sd').replace('sfo', 'sf').replace('tam', 'tb').replace('was', 'wsh').replace('kan', 'kc').replace('chw', 'cws')
-        # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        each = soup.findAll('td', attrs={'width':'25%'})
-        # put all matchups in a list.
-        ol = []
-        # each td is a matchup but its a horrid stopgap.
-        for ea in each:
-            links = ea.findAll('a')
-            for link in links:
-                linksplit = link['href'].split('/')
-                team = linksplit[7]
-                ol.append(self._bold(team.upper()))
-        # prepare to output with a major stopgap.
-        if len(ol) != 10:  # page isn't always there..
-            irc.reply("ERROR: I did not find playoff matchups. Check closer to playoffs.")
-        else:  # we did find something.
-            irc.reply("Playoffs: AL ({0} vs {1}) vs. {2} | {3} vs. {4} || NL: ({5} vs. {6}) vs. {7} | {8} vs. {9}".format(\
-                ol[0], ol[1], ol[2], ol[3], ol[4], ol[5], ol[6], ol[7], ol[8], ol[9]))
+        title = soup.findAll('h2')[1].getText()  # 2nd h2.
+        rows = soup.findAll('tr', attrs={'valign':'top', 'align':'center'})[2:7]  # skip the 2 headers, grab the first 5.
+        # list container we put teams in to later grab.
+        teams = []
+        # rows filtered above. each row is a team. we only have five here.
+        for row in rows:
+            team = row.find('td').getText()
+            team = self._bold(team)
+            teams.append(team)  # append so we can sort out later.
+        # now prepare to output. have to order the matchups string.
+        matchups = "(WC: {1} vs. {2}) vs. {0} || {3} vs. {4}".format(teams[0], teams[3], teams[4], teams[1], teams[2])
+        irc.reply("{0} :: {1}".format(self._red(title), matchups))
 
-    mlbplayoffs = wrap(mlbplayoffs)
+    mlbplayoffs = wrap(mlbplayoffs, [('somethingWithoutSpaces')])
 
     def mlbcareerleaders(self, irc, msg, args, optplayertype, optcategory):
         """<batting|pitching> <category>
