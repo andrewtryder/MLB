@@ -13,7 +13,7 @@ import datetime
 import random
 import sqlite3
 from itertools import groupby, count
-import os
+import os.path
 from base64 import b64decode
 # supybot libs.
 import supybot.utils as utils
@@ -35,6 +35,9 @@ class MLB(callbacks.Plugin):
         self.__parent = super(MLB, self)
         self.__parent.__init__(irc)
         self._mlbdb = os.path.abspath(os.path.dirname(__file__)) + '/db/mlb.db'
+
+    def die(self):
+        self.__parent.die()
 
     ##############
     # FORMATTING #
@@ -105,13 +108,11 @@ class MLB(callbacks.Plugin):
         except ValueError:
             return False
 
-    def _httpget(self, url, h=None, d=None):
-        """General HTTP resource fetcher. Supports b64encoded urls."""
+    def _httpget(self, url, h=None, d=None, l=True):
+        """General HTTP resource fetcher. Pass headers via h, data via d, and to log via l."""
 
-        if not url.startswith('http://'):
-            url = self._b64decode(url)
-
-        self.log.info(url)
+        if self.registryValue('logURLs') and l:
+            self.log.info(url)
 
         try:
             if h and d:
@@ -120,7 +121,7 @@ class MLB(callbacks.Plugin):
                 page = utils.web.getUrl(url)
             return page
         except utils.web.Error as e:
-            self.log.error("I could not open {0} error: {1}".format(url,e))
+            self.log.error("ERROR opening {0} message: {1}".format(url, e))
             return None
 
     def _b64decode(self, string):
@@ -1255,6 +1256,202 @@ class MLB(callbacks.Plugin):
 
     mlbremaining = wrap(mlbremaining, [('somethingWithoutSpaces')])
 
+    # !leaders nl|al|mlb <stat> [<year>]
+    def mlbleaders(self, irc, msg, args, optlist, optleague, optcat, optstat, optyear):
+        """[--postseason|--bottom] <mlb|nl|al> <statcategory> <statname> [year]
+        Display MLB leaders in various stat categories.
+
+        Use --postseason before to display postseason. Use --before to reverse the order.
+        """
+
+        # first, we declare our very long list of categories. used for validity/matching/url and the help.
+        stats = {'batting':{'AB':['At Bats', '/sort/atBats'],
+                            'R':['Runs', '/sort/runs'],
+                            'H':['Hits', '/sort/hits'],
+                            '2B':['Doubles', '/sort/doubles'],
+                            '3B':['Triples', '/sort/triples'],
+                            'HR':['Home Runs', '/sort/homeRuns'],
+                            'RBI':['Runs Batted In', '/sort/RBIs'],
+                            'SB':['Stolen Bases', '/sort/stolenBases'],
+                            'CS':['Caught Stealing', '/sort/caughtStealing'],
+                            'BB':['Walks', '/sort/walks'],
+                            'SO':['Strikeouts', '/sort/strikeouts'],
+                            'AVG':['Batting Average', '/sort'],
+                            'OBP':['On Base Percentage', '/sort/onBasePct'],
+                            'SLG':['Slugging Percentage', '/sort/slugAvg'],
+                            'OPS':['OBP+SLG', '/sort/OPS'],
+                            'WAR':['Wins Above Replacement', '/sort/WARBR'],
+                            'GP':['Games played', '/sort/gamesPlayed/type/expanded'],
+                            'TPA':['Total Plate Appearances', '/sort/plateAppearances/type/expanded'],
+                            'PIT':['Number of Pitches', '/sort/pitches/type/expanded'],
+                            'P/PA':['Pitches Per Plate Appearance', '/sort/pitchesPerPlateAppearance/type/expanded'],
+                            'TB':['Total Bases', '/sort/totalBases/type/expanded'],
+                            'XBH':['Extra Base Hits', '/sort/extraBaseHits/type/expanded'],
+                            'HBP':['Hit By Pitch', '/sort/hitByPitch/type/expanded'],
+                            'IBB':['Intentional Walks', '/sort/intentionalWalks/type/expanded'],
+                            'GDP':['Grounded Into Double Plays', '/sort/GIDPs/type/expanded'],
+                            'SH':['Sacrifice Hits', '/sort/sacHits/type/expanded'],
+                            'SF':['Sacrifice Flies', '/sort/sacFlies/type/expanded'],
+                            'RC':['Runs Created', '/sort/runsCreated/type/sabermetric'],
+                            'RC27':['Runs Created Per 27 Outs', '/sort/runsCreatedPer27Outs/type/sabermetric'],
+                            'ISOP':['Isolated Power', '/sort/isolatedPower/type/sabermetric'],
+                            'SECA':['Secondary Average', '/sort/secondaryAvg/type/sabermetric'],
+                            'GB':['Ground Balls', '/sort/groundBalls/type/sabermetric'],
+                            'FB':['Fly Balls', '/sort/flyBalls/type/sabermetric'],
+                            'G/F':['Ground Ball to Fly Ball Ratio', '/sort/groundToFlyRatio/type/sabermetric'],
+                            'AB/HR':['At Bats Per Home Run', '/sort/atBatsPerHomeRun/type/sabermetric'],
+                            'BB/PA':['Walks Per Plate Appearance', '/sort/walksPerPlateAppearance/type/sabermetric'],
+                            'BB/K':['Walk to Strikeout Ratio', '/sort/walkToStrikeoutRatio/type/sabermetric'] },
+                'fielding':{'FULL':['Innings', '/sort/fullInningsPlayed'],
+                            'TC':['Total Chances', '/sort/totalChances'],
+                            'PO':['Putouts', '/sort/putouts'],
+                            'A':['Assists', '/sort/assists'],
+                            'E':['Errors', '/sort/errors'],
+                            'DP':['Double Plays', '/sort/doublePlays'],
+                            'FPCT':['Fielding %', '/order/false'],
+                            'RP':['Range Factor', '/sort/rangeFactor'],
+                            'DWAR':['Defensive Wins Above Replacement', '/sort/defWARBR'] },
+                'pitching': {'IP':['Innings Pitched', '/sort/thirdInnings'],
+                             'H':['Hits', '/sort/hits'],
+                             'R':['Runs', '/sort/runs'],
+                             'ER':['Earned Runs', '/sort/earnedRuns'],
+                             'BB':['Walks', '/sort/walks'],
+                             'SO':['Strikeouts', '/sort/strikeouts'],
+                             'W':['Wins', '/sort/wins'],
+                             'L':['Losses', '/sort/losses'],
+                             'SV':['Saves', '/sort/saves'],
+                             'BKLSV':['Blown Saves', '/sort/blownSaves'],
+                             'WAR':['Wins Above Replacement', '/sort/WARBR'],
+                             'WHIP':['Walks/Hits per IP', '/sort/WHIP'],
+                             'ERA':['Earned Run Average', '/order/true'],
+                             'CG':['Complete Games', '/sort/completeGames/type/expanded'],
+                             'SHO':['Shutouts', '/sort/shutouts/type/expanded'],
+                             'TBF':['Total Batters Faced', '/sort/battersFaced/type/expanded'],
+                             'GF':['Games Finished', '/sort/finishes/type/expanded'],
+                             'SVO':['Save Opportunities', '/sort/saveOpportunities/type/expanded'],
+                             'SH':['Sac Bunts', '/sort/sacBunts/type/expanded'],
+                             'SF':['Sac Flies', '/sort/sacFlies/type/expanded'],
+                             'HBP':['Hit By Pitch', '/sort/battersHit/type/expanded'],
+                             'GDP':['Grounded Into DP', '/sort/GIDPs/type/expanded'],
+                             'WP':['Wild Pitches', '/sort/wildPitches/type/expanded'],
+                             'BK':['Balks', '/sort/balks/type/expanded'],
+                             'QS':['Quality Starts', '/sort/qualityStarts/type/expanded'],
+                             'QS%':['Quality Start %', '/sort/QSPct/type/expanded'],
+                             'K/BB':['Strikeout to walk ratio', '/sort/strikeoutToWalkRatio/type/expanded-2'],
+                             'K/9':['Strikeouts Per Nine innings', '/sort/strikeoutsPerNineInnings/type/expanded-2'],
+                             'PITCHES':['Number of Pitches', '/sort/pitches/type/expanded-2'],
+                             'P/PA':['Pitches Per Plate Appearance', '/sort/pitchesPerPlateAppearance/type/expanded-2'],
+                             'P/IP':['Pitches Per Inning', '/sort/pitchesPerInning/type/expanded-2'],
+                             'W%':['Winning Percentage', '/sort/winPct/type/expanded-2'],
+                             'AGS':['Average Game Score', '/sort/avgGameScore/type/expanded-2'],
+                             'GB':['Ground Balls', '/sort/groundBalls/type/expanded-2'],
+                             'FB':['Fly Balls', '/sort/flyBalls/type/expanded-2'],
+                             'G/F':['Ground Ball to Fly Ball Ratio', '/sort/groundToFlyRatio/type/expanded-2'],
+                             'RS':['Run Support Average (per start)', '/sort/runSupportPerStart/type/expanded-2'],
+                             'ERC':['Component ERA', '/sort/ERC/type/sabermetric'],
+                             'ERC%':['Component ERA Ratio', '/sort/ERCratio/type/sabermetric'],
+                             'DIPS':['Defense-independent ERA', '/sort/DIPSERA/type/sabermetric'],
+                             'DIP%':['Defense-independent ERA Ratio', '/sort/DIPSratio/type/sabermetric'],
+                             'TLoss':['Tough Losses', '/sort/toughLosses/type/sabermetric'],
+                             'CWin':['Cheap Wins', '/sort/cheapWins/type/sabermetric'],
+                             'PFR':['Power/Finesse Ratio', '/sort/PFR/type/sabermetric'],
+                             'BABIP':['Batting Average on Balls In Play', '/sort/BIPA/type/sabermetric'],
+                             'TB':['Opponent Total Bases', '/sort/opponentTotalBases/type/opponent-batting'],
+                             '2B':['Doubles', '/sort/doubles/type/opponent-batting'],
+                             '3B':['Triples', '/sort/triples/type/opponent-batting'],
+                             'HR':['Home Runs', '/sort/homeRuns/type/opponent-batting'],
+                             'RBI':['Runs Batted In', '/sort/RBIs/type/opponent-batting'],
+                             'IBB':['Intentional Walks', '/sort/intentionalWalks/type/opponent-batting'],
+                             'SB':['Stolen Bases', '/sort/stolenBases/type/opponent-batting'],
+                             'CS':['Caught Stealing', '/sort/caughtStealing/type/opponent-batting'],
+                             'CS%':['Caught Stealing Percentage', '/sort/caughtStealingPct/type/opponent-batting'],
+                             'BAA':['Opponents Batting Average', '/sort/opponentAvg/type/opponent-batting'],
+                             'OBP':['Opponents On Base Percentage', '/sort/opponentOnBasePct/type/opponent-batting'],
+                             'SLG':['Opponents Slugging Average', '/sort/opponentSlugAvg/type/opponent-batting'],
+                             'OPS':['OPS', '/sort/opponentOPS/type/opponent-batting'] }
+            }
+
+        # must process getopts (optlist) input before anything.
+        postseason, bottom = False, False
+        if optlist:
+            for (k, v) in optlist:
+                if k == 'postseason':  # postseason stats.
+                    postseason = True
+                if k == 'bottom':  # reverse order.
+                    bottom = True
+        # handle league. check for valid.
+        optleague = optleague.upper()  # lower to match.
+        validleagues = {'MLB':'', 'NL':'/league/nl', 'AL':'/league/al'}
+        if optleague not in validleagues:  # invalid league found.
+            irc.reply("ERROR: '{0}' is an invalid league. Must specify {1}".format(optleague, " | ".join(validleagues.keys())))
+            return
+        # handle the category.
+        optcat = optcat.lower()  # lower to match.
+        if optcat not in stats:
+            irc.reply("ERROR: '{0}' is an invalid category. Must be one of: {1}".format(optcat, " | ".join(stats.keys())))
+            return
+        # now handle the stats depending on the category.
+        optstat = optstat.upper()  # upper to match.
+        if optstat not in stats[optcat]:
+            irc.reply("ERROR: '{0}' is an invalid {1} category. Valid: {2}".format(optstat, optcat, " | ".join(sorted(stats[optcat].keys()))))
+            return
+        # now we look if year was specified. stays false otherwise.
+        if not optyear:  # optyear present?
+            optyear = False  # no optyear.
+        else:  # we do have optyear.
+            if 2000 <= optyear <= datetime.datetime.now().year:  # valid year.
+                optyear = optyear
+            else:  # invalid year.
+                irc.reply("ERROR: '{0}' is invalid. It must be between 2000 and the current year.".format(optyear))
+                return
+
+        # now we build URL.
+        url = b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy8=') + optcat + '/_' # year/2012
+        # add year if needed.
+        if optyear:
+            url += '/year/%s' % str(optyear)
+        # post or regular season?
+        if postseason:  # if postseason.
+            url += '/seasontype/3'
+        else:  # regular season.
+            url += '/seasontype/2'
+        url += validleagues[optleague]  # handle league (mlb|nl|al)
+        url += stats[optcat][optstat][1]  # last, add on the url part of the stat..
+        if bottom:  # if we want the bottom, the order is reversed.
+            url += '/order/false'
+        else:  # regular order (top->bottom)
+            url += '/order/true'
+
+        # now, with the url, fetch and return content.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # sanity check before we can process html.
+        if 'No results available based on the selected criteria.' in html:
+            irc.reply("ERROR: No results available based on the selected criteria. If using a year, make sure that season/postseason has been played.")
+            return
+        # process HTML.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        div = soup.find('div', attrs={'class':'mod-content'})  # below we fetch the season.
+        season = div.find('select', attrs={'class':'tablesm'}).find('option', attrs={'selected':'selected'}).getText()
+        playerdiv = soup.find('div', attrs={'id':'my-players-table'})  # div for table.
+        table = playerdiv.find('table', attrs={'class':'tablehead'})  # playerrows in here.
+        #colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')  # table headers.
+        rows = table.findAll('tr', attrs={'class':re.compile('(even|odd)row.*')})[0:10]  # top10 (or bottom10) only.
+        # list to store players and stat.
+        mlbstats = []
+        # each row is a player
+        for row in rows:
+            player = row.findAll('td')[1].getText().encode('utf-8')  # 2nd td = player.
+            stat = row.find('td', attrs={'class':'sortcell'}).getText()  # stat = sortcell.
+            mlbstats.append("{0} ({1})".format(self._bold(player), stat))  # append them to list.
+        # now we prepare the output.
+        irc.reply("{0} {1} LEADERS IN {2}({3}) :: {4}".format(self._red(season), optleague, self._ul(optstat), stats[optcat][optstat][0], " | ".join(mlbstats)))
+
+    mlbleaders = wrap(mlbleaders, [getopts({'postseason':'', 'bottom':''}), ('somethingWithoutSpaces'), ('somethingWithoutSpaces'), ('somethingWithoutSpaces'), optional('int')])
+
     def mlbplayoffs(self, irc, msg, args, optleague):
         """<AL|NL>
         Display playoff matchups if season ended today.
@@ -1631,31 +1828,34 @@ class MLB(callbacks.Plugin):
         if not optteam:  # team is not found in aliases or validteams.
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
-        # create url and do work.
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xpbmV1cHM/d2piPQ==')
+        # create url and fetch lineup page.
+        url = self._b64decode('aHR0cDovL2Jhc2ViYWxscHJlc3MuY29tL2xpbmV1cF90ZWFtLnBocD90ZWFtPQ==') + optteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-        # have to do some replacing for the regex to work. ugly but it works.
-        html = html.replace('<b  >', '<b>')  # this is broken in some places..
-        html = html.replace('<b>TAM</b>','<b>TB</b>').replace('<b>WAS</b>','<b>WSH</b>').replace('<b>CHW</b>','<b>CWS</b>')
-        html = html.replace('<b>KAN</b>','<b>KC</b>').replace('<b>SDG</b>','<b>SD</b>').replace('<b>SFO</b>','<b>SF</b>')
-        # dict for output.
-        lineups = {}
-        # each findall in the regex is a team/lineup.
-        for matches in re.findall(r'<b>(\w\w+)</b>(.*?)</div>', html, re.I|re.S|re.M):
-            team = matches[0].strip()
-            lineup = matches[1].strip()
-            lineups[team] = lineup  # append to dict.
-        # output time.
-        lineup = lineups.get(optteam)
-        if lineup:  # we found a team.
-            irc.reply("{0} lineup :: {1}".format(self._red(optteam), lineup))
-        else:  # sometimes not here because lineup is not out or team not playing.
-            irc.reply("ERROR: Could not find lineup for: {0}. Lineups will be available closer to game time.".format(optteam))
+        # sanity check.
+        if 'No game today' in html:
+            irc.reply("ERROR: No game today for {0}".format(optteam))
             return
+        # process html. this is kinda icky.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        div1 = soup.find('div', attrs={'id':'content'})
+        div2 = div1.find('div', attrs={'class':'lineup'})
+        divs = div2.findAll('div')
+        # each div has different information and must be processed differently.
+        firstdiv = divs[0]  # home pitcher.
+        #starttime = firstdiv.find('b').getText()
+        #teampitcher = firstdiv.find('a').getText()
+        seconddiv = divs[1]   # opp pitcher.
+        atvs = seconddiv.find('b').getText(separator=' ')
+        otherpitcher = seconddiv.findAll('a')[1].getText()
+        thirddiv = divs[2]  # lineups.
+        lineup = thirddiv.findAll('div')
+        # prepare to output.
+        lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
+        irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._red(optteam), atvs, otherpitcher, lineup))
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
 
