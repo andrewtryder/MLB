@@ -12,6 +12,7 @@ import collections
 import datetime
 import random
 import sqlite3
+import json
 from itertools import groupby, count
 import os.path
 from base64 import b64decode
@@ -1718,6 +1719,70 @@ class MLB(callbacks.Plugin):
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
+    def _eplayerfind(self, pname):
+        """Find a player's page via google ajax.."""
+
+        # construct url (properly escaped)
+        pname = "%s site:espn.go.com/mlb/player/" % pname
+        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % pname.replace(' ', '%20')
+        # now fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # load the json.
+        jsonf = json.loads(html)
+        # make sure status is 200.
+        if jsonf['responseStatus'] != 200:
+            return None
+        # make sure we have results.
+        results = jsonf['responseData']['results']
+        if len(results) == 0:
+            return None
+        # finally, return the url.
+        url = results[0]['url']
+        return url
+
+    def mlbgamestats(self, irc, msg, args, optplayer):
+        """<player name>
+
+        Fetch gamestats for player from current or past game.
+        Ex: Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._eplayerfind(optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
+        maintable = soup.find('table', attrs={'class':'player-profile-container'})
+        table = maintable.find('table', attrs={'class':'tablehead'})
+        gametime = maintable.find('div', attrs={'class':'time'}).getText(separator=' ')
+        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('th')
+        thisgame = table.findAll('tr')[1].findAll('td')
+        # see if we can find "This Game" (which means player is currently playing)
+        if thisgame[1].getText() == "This Game":
+            statline = [colhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(thisgame)]
+        else:  # find stats from last game.
+            prevgametable = soup.find('table', attrs={'class':'tablehead mod-player-stats'})
+            prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('td')
+            prevgame = prevgametable.findAll('tr')[2].findAll('td')
+            statline = [prevcolhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame)]
+        # prepare output.
+        irc.reply("{0} :: {1}".format(self._red(playername), " | ".join(statline)))
+
+    mlbgamestats = wrap(mlbgamestats, [('text')])
+
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW>
         Display divisional standings for a division.
@@ -1845,7 +1910,7 @@ class MLB(callbacks.Plugin):
         div2 = div1.find('div', attrs={'class':'lineup'})
         divs = div2.findAll('div')
         # each div has different information and must be processed differently.
-        firstdiv = divs[0]  # home pitcher.
+        #firstdiv = divs[0]  # home pitcher.
         #starttime = firstdiv.find('b').getText()
         #teampitcher = firstdiv.find('a').getText()
         seconddiv = divs[1]   # opp pitcher.
