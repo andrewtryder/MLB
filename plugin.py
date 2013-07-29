@@ -1767,7 +1767,7 @@ class MLB(callbacks.Plugin):
         playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
         maintable = soup.find('table', attrs={'class':'player-profile-container'})
         table = maintable.find('table', attrs={'class':'tablehead'})
-        gametime = maintable.find('div', attrs={'class':'time'}).getText(separator=' ')
+        # gametime = maintable.find('div', attrs={'class':'time'}).getText(separator=' ')
         colhead = table.find('tr', attrs={'class':'colhead'}).findAll('th')
         thisgame = table.findAll('tr')[1].findAll('td')
         # see if we can find "This Game" (which means player is currently playing)
@@ -1775,6 +1775,10 @@ class MLB(callbacks.Plugin):
             statline = [colhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(thisgame)]
         else:  # find stats from last game.
             prevgametable = soup.find('table', attrs={'class':'tablehead mod-player-stats'})
+            if not prevgametable:  # can't find that.
+                irc.reply("ERROR: I could not find any previous game nor current game stats for: {0}. Perhaps they have not played in a bit?".format(playername))
+                return
+            # else.
             prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('td')
             prevgame = prevgametable.findAll('tr')[2].findAll('td')
             statline = [prevcolhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame)]
