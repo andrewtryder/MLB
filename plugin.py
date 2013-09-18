@@ -1788,8 +1788,10 @@ class MLB(callbacks.Plugin):
     mlbgamestats = wrap(mlbgamestats, [('text')])
 
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
-        """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW>
+        """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW|ALWC|NLWC>
+
         Display divisional standings for a division.
+        Can also display wild-card standings via ALWC or NLWC.
         Use --full or --expanded or --vsdivision to show extended stats.
         Ex: --full ALC or --expanded ALE.
         """
@@ -1804,24 +1806,29 @@ class MLB(callbacks.Plugin):
             if option == 'vsdivision':
                 vsdivision = True
         # now check optdiv for the division.
-        optdiv = optdiv.upper() # lower to match keys. values are in the table to match with the html.
+        optdiv = optdiv.upper() # upper to match keys. values are in the table to match with the html.
         leaguetable =   {'ALE': 'American League EAST',
                          'ALC': 'American League CENTRAL',
                          'ALW': 'American League WEST',
                          'NLE': 'National League EAST',
                          'NLC': 'National League CENTRAL',
-                         'NLW': 'National League WEST' }
+                         'NLW': 'National League WEST',
+                         'ALWC': 'American League AMERICAN',
+                         'NLWC': 'National League NATIONAL'}
         if optdiv not in leaguetable:  # make sure keys are present.
             irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
             return
 
         # build and fetch url. diff urls depending on option.
-        if expanded:
-            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL2V4cGFuZGVk')
-        elif vsdivision:
-            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3ZzLWRpdmlzaW9u')
+        if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # special url for WC.
+            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3dpbGQtY2FyZA0K')
         else:
-            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3M=')
+            if expanded:
+                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL2V4cGFuZGVk')
+            elif vsdivision:
+                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3ZzLWRpdmlzaW9u')
+            else:
+                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3M=')
         # now fetch url.
         html = self._httpget(url)
         if not html:
@@ -1856,33 +1863,39 @@ class MLB(callbacks.Plugin):
                 object_list.append(d)  # append OD to list.
         # partial sanity check but more of a cheap copy because of how we output.
         if len(object_list) > 0:
-            object_list.insert(0,object_list[0])  # copy first item again.
+            object_list.insert(0, object_list[0])  # copy first item again.
         else:  # bailout if something broke but most likely did above.
             irc.reply("ERROR: Something broke returning mlbstandings.")
             return
         # now prepare to output.
-        if not full and not expanded and not vsdivision:  # display short.
-            divstandings = []  # list for output.
-            for i, each in enumerate(object_list[1:]):  # skip the first since its the header. iterate through to format+append.
-                divstr = "#{0} {1} {2}-{3} {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB'])
-                divstandings.append(divstr)  # append.
-            # now output the short.
-            irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(divstandings)))
-        else:  # display full rankings.
-            for i, each in enumerate(object_list):
-                if i == 0:  # to print the duplicate but only output the header of the table.
-                    headerOut = ""
-                    for keys in each.keys():  # only keys on the first list entry, a dummy/clone.
-                        headerOut += "{0:{1}}".format(self._ul(keys), max(lengthlist[keys])+4, key=int)  # normal +2 but bold eats up +2 more, so +4.
-                    irc.reply(headerOut)  # output header.
-                else:  # print the division now.
-                    tableRow = ""  # empty string we += to with each "row".
-                    for inum, k in enumerate(each.keys()):
-                        if inum == 0:  # team here, which we want to bold.
-                            tableRow += "{0:{1}}".format(self._bold(each[k]),max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
-                        else:  # rest of the elements outside the team.
-                            tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
-                    irc.reply(tableRow)  # output.
+        if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # redundant method to handle the wild-card but we need it.
+            wcstandings = []  # list for output.
+            for i, each in enumerate(object_list[1:7]):  # only display 1-5.
+                wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
+            irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(wcstandings)))
+        else:  # non wild-card stuff.
+            if ((not full) and (not expanded) and (not vsdivision)):  # display short.
+                divstandings = []  # list for output.
+                for i, each in enumerate(object_list[1:]):  # skip the first since its the header. iterate through to format+append.
+                    divstr = "#{0} {1} {2}-{3} {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB'])
+                    divstandings.append(divstr)  # append.
+                # now output the short.
+                irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(divstandings)))
+            else:  # display full rankings.
+                for i, each in enumerate(object_list):
+                    if i == 0:  # to print the duplicate but only output the header of the table.
+                        headerOut = ""
+                        for keys in each.keys():  # only keys on the first list entry, a dummy/clone.
+                            headerOut += "{0:{1}}".format(self._ul(keys), max(lengthlist[keys])+4, key=int)  # normal +2 but bold eats up +2 more, so +4.
+                        irc.reply(headerOut)  # output header.
+                    else:  # print the division now.
+                        tableRow = ""  # empty string we += to with each "row".
+                        for inum, k in enumerate(each.keys()):
+                            if inum == 0:  # team here, which we want to bold.
+                                tableRow += "{0:{1}}".format(self._bold(each[k]),max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
+                            else:  # rest of the elements outside the team.
+                                tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
+                        irc.reply(tableRow)  # output.
 
     mlbstandings = wrap(mlbstandings, [getopts({'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
 
