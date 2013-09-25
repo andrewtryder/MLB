@@ -771,8 +771,8 @@ class MLB(callbacks.Plugin):
             append_list.append("{0} - {1} ejected {2} ({3})".format(date, umpname, ejected, ejteam))
         # prepare output.
         irc.reply("{0} :: {1} ejections this season.".format(self._bold(ejectedTitle), self._red(ejectedTotal)))
-        uc = "Umps with most ejections :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in umpcounter.most_common(3)]))
-        pe = "Players ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)]))
+        uc = "Teams with most ejections :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in umpcounter.most_common(3)]))
+        pe = "Players/Managers ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)]))
         irc.reply("{0} || {1}".format(uc, pe))
         irc.reply(" | ".join([item for item in append_list]))
 
