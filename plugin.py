@@ -753,7 +753,6 @@ class MLB(callbacks.Plugin):
         # each row is an ejection.
         for row in rows:
             tds = row.findAll('td')
-            self.log.info(str(tds))
             date = tds[0].getText()
             umpname = tds[4].getText()  # fix umpname below.
             if "," in umpname:  # if umpname is last, first
