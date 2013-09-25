@@ -753,6 +753,7 @@ class MLB(callbacks.Plugin):
         # each row is an ejection.
         for row in rows:
             tds = row.findAll('td')
+            self.log.info(str(tds))
             date = tds[0].getText()
             umpname = tds[4].getText()  # fix umpname below.
             if "," in umpname:  # if umpname is last, first
@@ -761,7 +762,7 @@ class MLB(callbacks.Plugin):
             else:  # just strip the spaces.
                 umpname = umpname.strip()
             ejteam = tds[5].getText()
-            ejected = tds[7].getText()
+            ejected = tds[6].getText()
             date = self._dtFormat('%m/%d', date, '%B %d, %Y')  # conv date to smaller one
             # update our counters
             umpcounter[umpname] += 1
@@ -770,8 +771,9 @@ class MLB(callbacks.Plugin):
             append_list.append("{0} - {1} ejected {2} ({3})".format(date, umpname, ejected, ejteam))
         # prepare output.
         irc.reply("{0} :: {1} ejections this season.".format(self._bold(ejectedTitle), self._red(ejectedTotal)))
-        irc.reply("Umps with most ejections :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in umpcounter.most_common(3)])))
-        irc.reply("Players ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)])))
+        uc = "Umps with most ejections :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in umpcounter.most_common(3)]))
+        pe = "Players ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)]))
+        irc.reply("{0} || {1}".format(uc, pe))
         irc.reply(" | ".join([item for item in append_list]))
 
     mlbejections = wrap(mlbejections)
