@@ -209,8 +209,9 @@ class MLB(callbacks.Plugin):
         Display countdown until next MLB opening day.
         """
 
-        oDay = (datetime.datetime(2014, 03, 31) - datetime.datetime.now()).days
-        irc.reply("{0} day(s) until 2014 MLB Opening Day.".format(oDay))
+	y = 2014
+        oDay = (datetime.datetime(y, 03, 30) - datetime.datetime.now()).days
+        irc.reply("{0} day(s) until {1} MLB Opening Day.".format(oDay, y))
 
     mlbcountdown = wrap(mlbcountdown)
 
@@ -1838,6 +1839,10 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8') # one of these below will break if formatting changes.
+	stitle = soup.find('title')  # dirty check for spring training.
+	if stitle and 'Spring Training' in stitle.text:  # we found it.
+	    irc.reply("ERROR: I don't do standings during Spring Training. Check back in the regular season.")
+	    return
         div = soup.find('div', attrs={'class':'mod-container mod-table mod-no-header'}) # div has all
         table = div.find('table', attrs={'class':'tablehead'}) # table in there
         rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')}) # rows are each team
