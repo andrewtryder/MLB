@@ -1933,21 +1933,17 @@ class MLB(callbacks.Plugin):
             return
         # process html. this is kinda icky.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div1 = soup.find('div', attrs={'id':'content'})
-        div2 = div1.find('div', attrs={'class':'lineup'})
-        divs = div2.findAll('div')
-        # each div has different information and must be processed differently.
-        #firstdiv = divs[0]  # home pitcher.
-        #starttime = firstdiv.find('b').getText()
-        #teampitcher = firstdiv.find('a').getText()
-        seconddiv = divs[1]   # opp pitcher.
-        atvs = seconddiv.find('b').getText(separator=' ')
-        otherpitcher = seconddiv.findAll('a')[1].getText()
-        thirddiv = divs[2]  # lineups.
+	div = soup.find('div', attrs={'class':'team-lineup highlight'})
+	divs = div.findAll('div')	
+	# 20140330 - had to fix this again.
+	gmdate = divs[1].getText()  # date of game.
+        seconddiv = divs[3]   # opp pitcher.
+        otherpitcher = seconddiv.getText()  # opp pitcher and team.
+        thirddiv = divs[5]  # lineups.
         lineup = thirddiv.findAll('div')
         # prepare to output.
         lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
-        irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._red(optteam), atvs, otherpitcher, lineup))
+        irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(optteam, gmdate, otherpitcher, lineup))
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
 
