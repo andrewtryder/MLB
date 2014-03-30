@@ -355,14 +355,18 @@ class MLB(callbacks.Plugin):
         for game in games:
             teams = game.findAll('p', attrs={'class':'team-name'})
             for team in teams:  # each game has two teams.
-                ahref = team.find('a')['href']
-                teamname = ahref.split('/')[7].lower()  # will be lowercase.
-                teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
-                teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
-                teamdict.setdefault(str(teamname), []).append(teamid)
+		tt = team.find('a')
+		if tt:
+		    # self.log.info("team: {0}".format(team))
+		    ahref = team.find('a')['href']
+		    teamname = ahref.split('/')[7].lower()  # will be lowercase.
+		    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+		    teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
+		    teamdict.setdefault(str(teamname), []).append(teamid)
         # grab the gameid. fetch.
         teamgameids = teamdict.get(optteam)
         # sanity check before we grab the game.
+	# self.log.info("TEAMGAMEIDS: {0}".format(teamgameids))
         if not teamgameids:
             # self.log.info("ERROR: I got {0} as a team. I only have: {1}".format(optteam, str(teamdict)))
             irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
