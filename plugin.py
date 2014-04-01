@@ -119,9 +119,10 @@ class MLB(callbacks.Plugin):
             if h and d:
                 page = utils.web.getUrl(url, headers=h, data=d)
             else:
-                page = utils.web.getUrl(url)
+		h = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
+                page = utils.web.getUrl(url, headers=h)
             return page
-        except utils.web.Error as e:
+        except Exception as e:
             self.log.error("ERROR opening {0} message: {1}".format(url, e))
             return None
 
@@ -1635,7 +1636,7 @@ class MLB(callbacks.Plugin):
 
     def mlbschedule(self, irc, msg, args, optteam):
         """<team>
-        Display the last and next five upcoming games for team.
+        Display the next five upcoming games for team.
         Ex: NYY
         """
 
@@ -1645,39 +1646,38 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
         # translate team for url.
-        lookupteam = self._translateTeam('yahoo', 'team', optteam) # (db, column, optteam)
+        lookupteam = self._translateTeam('eid', 'team', optteam) # (db, column, optteam)
         # build and fetch url.
-        url = self._b64decode('aHR0cDovL3Nwb3J0cy55YWhvby5jb20vbWxiL3RlYW1z') + '/%s/calendar/rss.xml' % lookupteam
+	# 
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW1zY2hlZHVsZQ==') + '?teamId=%s&wjb=' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-        # sanity check.
-        if "Schedule for" not in html:
-            irc.reply("ERROR: Cannot find schedule. Broken url?")
-            return
-        # clean html up before attempting to parse.
-        html = html.replace('<![CDATA[','')  #remove cdata
-        html = html.replace(']]>','')  # end of cdata
-        html = html.replace('EDT','')  # tidy up times
-        html = html.replace('\xc2\xa0',' ')  # remove some stupid character.
+        # sanity check. ? figure out when it breaks!
+	if "No games scheduled." in html:
+	    irc.reply("ERROR: I do not see any games scheduled.")
+	    return
         # now soup the actual html. BS cleans up the RSS because the HTML is junk.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        items = soup.find('channel').findAll('item')
+	table = soup.find('table', attrs={'class':'table'})
+	if not table:
+	    irc.reply("ERROR: I could not find the future games in schedule for this team. Formatting change?")
+	    return
+	# now, we have the table. each row is a game (header row also)
+	# self.log.info("TABLE: {0}".format(table))
+	rows = table.findAll('tr')[2:7]
         # list for output.
         append_list = []
         # we're going over semi-broken RSS here.
-        for item in items:
-            title = item.find('title').getText().strip()  # title is good.
-            day, date = title.split(',')
-            desc = item.find('description')  # everything in desc but its messy.
-            desctext = desc.findAll(text=True)  # get all text, first, but its in a list.
-            descappend = (''.join(desctext).strip())  # list transform into a string.
-            if not descappend.startswith('@'):  # if something is @, it's before, but vs. otherwise.
-                descappend = 'vs. ' + descappend
-            descappend += " [" + date.strip() + "]"  # can't translate since Yahoo! sucks with the team names here.
-            append_list.append(descappend)  # put all into a list.
+        for row in rows:
+	    tds = row.findAll('td')
+	    dte = tds[0].getText().encode('utf-8')  # remove all digits
+	    dte = filter(lambda c: not c.isdigit(), dte)
+	    opp = tds[1].getText().encode('utf-8')
+	    tme = tds[2].getText().encode('utf-8')
+            append_list.append("{0} {1}  {2}".format(dte, opp, tme))
         # prepare output string and output.
         descstring = " | ".join([item for item in append_list])
         irc.reply("{0} :: {1}".format(self._bold(optteam), descstring))
