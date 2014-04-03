@@ -1684,6 +1684,43 @@ class MLB(callbacks.Plugin):
 
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
 
+    def mlbdailyleaders(self, irc, msg, args):
+	"""
+	Display MLB daily leaders.
+	"""
+
+        # build and fetch url.
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9kYWlseWxlYWRlcnM=')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.	
+	soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	mlbdate = soup.find('h1', attrs={'class':'h2'})
+	div = soup.find('div', attrs={'id':'my-players-table'})
+	if not div:
+	    irc.reply("ERROR: Broken HTML. Check page formatting.")
+	    return
+	table = div.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'})
+	if not table:
+	    irc.reply("ERROR: Broken HTML. Check page formatting.")
+	    return
+	rows = table.findAll('tr', attrs={'class':re.compile('evenrow.*|oddrow.*')})
+	# container
+	mlbdailyleaders = []
+	# iterate over each row.
+	for row in rows[0:10]:
+	    tds = row.findAll('td')
+	    num = tds[0].getText()
+	    plr = tds[1].getText().encode('utf-8')
+	    mlbdailyleaders.append("{0}. {1}".format(num, plr))
+	# now output.
+	irc.reply("{0} :: {1}".format(self._bold(mlbdate.getText()), " ".join([i for i in mlbdailyleaders])))
+    
+    mlbdailyleaders = wrap(mlbdailyleaders)
+
     def mlbmanager(self, irc, msg, args, optteam):
         """<team>
         Display the manager for team.
