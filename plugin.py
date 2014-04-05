@@ -1922,9 +1922,10 @@ class MLB(callbacks.Plugin):
 	# sanity check.
 	if "No lineup yet" in lineup.getText():
 	    irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
-	else:
+	else:  # div is a collection of divs, each div = person in lineup.
+	    lineup = lineup.findAll('div')
 	    lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
-	    irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(optteam, gmdate, otherpitcher, lineup))
+	irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._bold(optteam), gmdate, otherpitcher, lineup))
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
 
