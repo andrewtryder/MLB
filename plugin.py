@@ -1809,24 +1809,43 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
         maintable = soup.find('table', attrs={'class':'player-profile-container'})
-        table = maintable.find('table', attrs={'class':'tablehead'})
+	mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
+	# have to look at what's in mtheader to determine the statline.
+	if 'PREVIOUS GAME' in mtheader:  # previous game.
+	    # find the details of the previous game.
+	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
+	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText()
+	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText()
+	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText()
+	    prevgametable = maintable.find('table', attrs={'class':'tablehead'})
+	    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            prevgame = prevgametable.findAll('tr')[1].findAll('td')
+	    if prevgame[0].getText() != "This Game":
+		irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
+		return
+            statline = [prevcolhead[i+1].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
+	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._red(playername), gametime, gameaway, gamehome, " | ".join(statline)))
+	else:  # game in progress.
+	    irc.reply("NO PREVIOUS GAME.")
         # gametime = maintable.find('div', attrs={'class':'time'}).getText(separator=' ')
-        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('th')
-        thisgame = table.findAll('tr')[1].findAll('td')
-        # see if we can find "This Game" (which means player is currently playing)
-        if thisgame[1].getText() == "This Game":
-            statline = [colhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(thisgame)]
-        else:  # find stats from last game.
-            prevgametable = soup.find('table', attrs={'class':'tablehead mod-player-stats'})
-            if not prevgametable:  # can't find that.
-                irc.reply("ERROR: I could not find any previous game nor current game stats for: {0}. Perhaps they have not played in a bit?".format(playername))
-                return
-            # else.
-            prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('td')
-            prevgame = prevgametable.findAll('tr')[2].findAll('td')
-            statline = [prevcolhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame)]
+	
+        #colhead = table.find('tr', attrs={'class':'colhead'}).findAll('th')
+        #thisgame = table.findAll('tr')[1].findAll('td')
+        ## see if we can find "This Game" (which means player is currently playing)
+        #if thisgame[1].getText() == "This Game":
+        #    statline = [colhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(thisgame)]
+        #else:  # find stats from last game.
+        #    prevgametable = soup.find('table', attrs={'class':'tablehead mod-player-stats'})
+        #    if not prevgametable:  # can't find that.
+        #        irc.reply("ERROR: I could not find any previous game nor current game stats for: {0}. Perhaps they have not played in a bit?".format(playername))
+        #        return
+        #    # else.
+        #    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('td')
+        #    prevgame = prevgametable.findAll('tr')[2].findAll('td')
+        #    statline = [prevcolhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame)]
         # prepare output.
-        irc.reply("{0} :: {1}".format(self._red(playername), " | ".join(statline)))
+        #irc.reply("{0} :: {1}".format(self._red(playername), " | ".join(statline)))
 
     mlbgamestats = wrap(mlbgamestats, [('text')])
 
