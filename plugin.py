@@ -1742,37 +1742,33 @@ class MLB(callbacks.Plugin):
 	    # find the details of the previous game.
 	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
 	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText()
-	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText()
-	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText()
+	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
 	    prevgametable = maintable.find('table', attrs={'class':'tablehead'})
 	    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
             prevgame = prevgametable.findAll('tr')[1].findAll('td')
 	    if prevgame[0].getText() != "This Game":
 		irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
 		return
-            statline = [prevcolhead[i+1].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
-	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._red(playername), gametime, gameaway, gamehome, " | ".join(statline)))
-	else:  # game in progress.
-	    irc.reply("NO PREVIOUS GAME.")
-        # gametime = maintable.find('div', attrs={'class':'time'}).getText(separator=' ')
-	
-        #colhead = table.find('tr', attrs={'class':'colhead'}).findAll('th')
-        #thisgame = table.findAll('tr')[1].findAll('td')
-        ## see if we can find "This Game" (which means player is currently playing)
-        #if thisgame[1].getText() == "This Game":
-        #    statline = [colhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(thisgame)]
-        #else:  # find stats from last game.
-        #    prevgametable = soup.find('table', attrs={'class':'tablehead mod-player-stats'})
-        #    if not prevgametable:  # can't find that.
-        #        irc.reply("ERROR: I could not find any previous game nor current game stats for: {0}. Perhaps they have not played in a bit?".format(playername))
-        #        return
-        #    # else.
-        #    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('td')
-        #    prevgame = prevgametable.findAll('tr')[2].findAll('td')
-        #    statline = [prevcolhead[i].getText() + ": " + x.getText() for (i, x) in enumerate(prevgame)]
-        # prepare output.
-        #irc.reply("{0} :: {1}".format(self._red(playername), " | ".join(statline)))
+            statline = [self._bold(prevcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
+	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " | ".join(statline)))
+	elif "CURRENT GAME" in mtheader:
+	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
+	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
+	    curgametable = maintable.find('table', attrs={'class':'tablehead'})
+	    curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            curgame = curgametable.findAll('tr')[1].findAll('td')
+	    if curgame[0].getText() != "This Game":
+		irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
+		return
+            statline = [self._bold(curcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(curgame[1:])]
+	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " | ".join(statline)))
+	else:
+	    irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
 
     mlbgamestats = wrap(mlbgamestats, [('text')])
 
