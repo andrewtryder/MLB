@@ -1999,7 +1999,6 @@ class MLB(callbacks.Plugin):
             irc.reply("Something broke heavily formatting on powerrankings page.")
             return
         # go about regular html business.
-        datehead = soup.find('div', attrs={'class':'date floatleft'}).getText()
         table = soup.find('table', attrs={'class':'tablehead'})
         headline = table.find('tr', attrs={'class':'stathead'})
         rows = table.findAll('tr', attrs={'class':re.compile('^oddrow|^evenrow')})
@@ -2012,19 +2011,10 @@ class MLB(callbacks.Plugin):
             team = tds[1].find('div', attrs={'style':'padding:10px 0;'}).find('a').getText() # finds short.
             lastweek = tds[2].find('span', attrs={'class':'pr-last'}).getText()
             lastweek = lastweek.replace('Last Week:', '').strip() # rank #
-            # check if we're up or down and insert a symbol.
-            if int(rank) < int(lastweek):
-                symbol = self._green('▲')
-            elif int(rank) > int(lastweek):
-                symbol = self._red('▼')
-            else: # - if the same.
-                symbol = "-"
             # now add the rows to our data structures.
-            powerrankings.append("{0}. {1} (prev: {2} {3})".format(rank, team, symbol, lastweek))
-        # now output. conditional if we have the team or not.
-        irc.reply("{0}".format(self._blue(headline.getText()), self._bold(datehead)))
-        for N in self._batch(powerrankings, 12): # iterate through each team. 12 per line
-            irc.reply("{0}".format(" | ".join([item for item in N])))
+            powerrankings.append("{0}. {1} (prev: {2})".format(rank, team, lastweek))
+        # now output.
+        irc.reply("{0} :: {1}".format(self._bold(headline.getText()), " | ".join([i for i in powerrankings])))
 
     mlbpowerrankings = wrap(mlbpowerrankings)
 
