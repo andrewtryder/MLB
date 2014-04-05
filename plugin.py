@@ -2082,7 +2082,7 @@ class MLB(callbacks.Plugin):
 
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
-    def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
+    def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
         """<MLB|AL|NL> <category>
         Display top 10 teams in category for a specific stat.
         Categories: hr, avg, rbi, ra, sb, era, whip, k
@@ -2125,7 +2125,7 @@ class MLB(callbacks.Plugin):
         thelist = " | ".join([item for item in append_list])
         irc.reply("Leaders in {0} for {1} :: {2}".format(self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
 
-    mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbteamtrans(self, irc, msg, args, optteam):
         """<team>
