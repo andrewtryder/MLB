@@ -1564,40 +1564,46 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
         # translate team for url.
-        lookupteam = self._translateTeam('eid', 'team', optteam) # (db, column, optteam)
+        lookupteam = self._translateTeam('eshort', 'team', optteam) # (db, column, optteam)
         # build and fetch url.
-	# 
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL3RlYW1zY2hlZHVsZQ==') + '?teamId=%s&wjb=' % lookupteam
+	#
+	url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3NjaGVkdWxlL18vbmFtZQ==') + '/%s/' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-        # sanity check. ? figure out when it breaks!
-	if "No games scheduled." in html:
-	    irc.reply("ERROR: I do not see any games scheduled.")
-	    return
         # now soup the actual html. BS cleans up the RSS because the HTML is junk.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	table = soup.find('table', attrs={'class':'table'})
-	if not table:
-	    irc.reply("ERROR: I could not find the future games in schedule for this team. Formatting change?")
+	div = soup.find('div', attrs={'id':'my-teams-table'})
+	table = div.find('table', attrs={'class':'tablehead'})
+	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow.*|^oddrow.*')})
+	# 
+	container = []
+	#
+	for (i, tr) in enumerate(trs):
+	    tds = tr.findAll('td')
+	    sta = tds[3].getText()
+	    if sta == "":
+		container.append(i)
+	#
+	if len(container) > 0:
+	    schednum = container[0]
+	else:
+	    self.log.info("ERROR: mlbschedule. I only got {0} in container (no [2])".format(container))
+	    irc.reply("ERROR: Something went wrong looking up the schedule. Try again later.")
 	    return
-	# now, we have the table. each row is a game (header row also)
-	# self.log.info("TABLE: {0}".format(table))
-	rows = table.findAll('tr')[2:7]
-        # list for output.
-        append_list = []
-        # we're going over semi-broken RSS here.
-        for row in rows:
-	    tds = row.findAll('td')
-	    dte = tds[0].getText().encode('utf-8')  # remove all digits
-	    dte = filter(lambda c: not c.isdigit(), dte)
-	    opp = tds[1].getText().encode('utf-8')
-	    tme = tds[2].getText().encode('utf-8')
-            append_list.append("{0} {1}  {2}".format(dte, opp, tme))
+	#
+	schedule = []
+	#
+	for tr in trs[schednum:schednum+5]:
+	    tds = tr.findAll('td')
+	    dte = tds[0].getText().encode('utf-8')
+	    opp = tds[1].getText().encode('utf-8').replace('vs', 'vs ')
+	    sta = tds[2].getText().encode('utf-8')
+	    schedule.append("{0} {1} {2}".format(dte, opp, sta))
         # prepare output string and output.
-        descstring = " | ".join([item for item in append_list])
+        descstring = " | ".join([item for item in schedule])
         irc.reply("{0} :: {1}".format(self._bold(optteam), descstring))
 
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
