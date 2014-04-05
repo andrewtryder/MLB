@@ -1922,11 +1922,13 @@ class MLB(callbacks.Plugin):
 	gmdate = divs[1].getText()  # date of game.
         seconddiv = divs[3]   # opp pitcher.
         otherpitcher = seconddiv.getText()  # opp pitcher and team.
-        thirddiv = divs[5]  # lineups.
-        lineup = thirddiv.findAll('div')
-        # prepare to output.
-        lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
-        irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(optteam, gmdate, otherpitcher, lineup))
+	lineup = div.find('div', attrs={'class':'game-lineup'})
+	# sanity check.
+	if "No lineup yet" in lineup.getText():
+	    irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
+	else:
+	    lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
+	    irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(optteam, gmdate, otherpitcher, lineup))
 
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
 
