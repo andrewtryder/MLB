@@ -1026,7 +1026,7 @@ class MLB(callbacks.Plugin):
         # need to translate team for the url
         lookupteam = self._translateTeam('st', 'team', optteam)
         # fetch url.
-        url = self._b64decode('aHR0cDovL3d3dy5zcG90cmFjLmNvbS9tbGIv') + '%s/team-payroll/' % lookupteam
+        url = self._b64decode('aHR0cDovL3d3dy5zcG90cmFjLmNvbS9tbGIv') + '%s/payroll/' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -1035,30 +1035,21 @@ class MLB(callbacks.Plugin):
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         teamtitle = soup.find('title')
-        tbody = soup.find('tbody')
-        paytds = tbody.findAll('td', attrs={'class':'total team total-title'})
+        table = soup.find('table', attrs={'id':'teamTable'})
+	# we just use rows here. last 4 only.
+	rows = table.findAll('tr')[-4:]
         # list for output.
         payroll = []
-        # different rows applicable to payroll here.
-        for paytd in paytds:
-            row = paytd.findPrevious('tr')
-            paytitle = row.find('td', attrs={'class': 'total team total-title'})
-            payfigure = row.find('td', attrs={'class': 'total figure'})
-            payfigure = self._format_cap(payfigure.getText())
-            payroll.append("{0}: {1}".format(self._ul(paytitle.getText()), payfigure))
-        # we need the last row. this is horrible but works.
-        bottomrow = tbody.findAll('tr')
-        bottomtds = bottomrow[-1].findAll('td')
-        # take each TD, format the cap, all from last row.
-        basesalary = self._format_cap(bottomtds[1].getText())
-        signingbonus = self._format_cap(bottomtds[2].getText())
-        otherbonus = self._format_cap(bottomtds[3].getText())
-        totalpayroll = self._format_cap(bottomtds[4].getText())
-        # now output.
-        irc.reply("{0} :: Base Salaries {1} | Signing Bonuses {2} | Other Bonus {3} :: TOTAL PAYROLL {4}".format(\
-            self._red(teamtitle.getText()), self._bold(basesalary), self._bold(signingbonus),\
-                self._bold(otherbonus), self._bold(totalpayroll)))
-        irc.reply("{0} :: {1}".format(self._red(teamtitle.getText()), " | ".join([item for item in payroll])))
+        # iterate over rows.
+	for row in rows[0:3]:  # first 3.
+	    tds = row.findAll('td')
+	    t = tds[0].getText()
+	    figure = self._format_cap(tds[4].getText())
+	    payroll.append("{0}: {1}".format(self._ul(t), figure))
+	# last one. just grab the "total" figure.
+	totalcap = self._format_cap(rows[3].find('span', attrs={'class':'cap total'}).getText())  # specific one.
+	# output
+        irc.reply("{0} :: Total Cap: {1} :: {2}".format(self._bold(teamtitle.getText()), totalcap, " | ".join([item for item in payroll])))
 
     mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
 
