@@ -1711,6 +1711,65 @@ class MLB(callbacks.Plugin):
         url = results[0]['url']
         return url
 
+    def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
+        """<year> <player name>
+
+        Fetch season stats for player.
+        Ex: 2010 Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._eplayerfind(optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+	# now replace the url so we can grab stats.
+	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
+	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
+	# sanity check
+	if len(trs) == 0:
+	    print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
+	# container
+	st = collections.defaultdict(list)
+	# iterate over their stats.
+	for tr in trs:
+	    tds = tr.findAll('td')
+	    yr = tds[0].getText()
+	    tmp = {}  # tmp dict
+	    for (i, z) in enumerate(tds[1:]):  # mate them up with colhead. +1
+		tmp[colhead[i+1].getText()] = z.getText()  # inject.
+	    # once done, append tmp to st.
+	    st[int(yr)].append(tmp)
+	# now lets grab the year.
+	outstat = st.get(optyear)
+	# make sure we have that year.
+	if not outstat:
+	    irc.reply("ERROR: I did not find stats for {0} in {1}.".format(plrname, optyear))
+	    return
+	# lets format output.
+	outstr = []
+	# iterate over each item in the year.
+	for q in outstat:  # each item here is going to be a dictionary.
+	    outstr.append("{0}".format(self._ul(q['TEAM'])))
+	    for (k, v) in q.items():
+		if k != 'TEAM':  # team injected above
+		    outstr.append("{0}: {1}".format(self._bold(k), v))
+	# finally, output
+	irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
+    
+    mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
+
     def mlbgamestats(self, irc, msg, args, optplayer):
         """<player name>
 
