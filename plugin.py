@@ -1584,7 +1584,7 @@ class MLB(callbacks.Plugin):
 	for (i, tr) in enumerate(trs):
 	    tds = tr.findAll('td')
 	    sta = tds[3].getText()
-	    if sta == "":
+	    if sta == "" or sta == "MLB Network":
 		container.append(i)
 	#
 	if len(container) > 0:
