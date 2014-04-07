@@ -1770,6 +1770,45 @@ class MLB(callbacks.Plugin):
     
     mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
 
+    def mlbplayerinfo(self, irc, msg, args, optplayer):
+        """<player name>
+
+        Fetch gamestats for player from current or past game.
+        Ex: Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._eplayerfind(optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	div = soup.find('div', attrs={'class':'mod-content'})
+	if not div:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return
+	# find their name.
+	pname = div.find('h1')
+	if not pname:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return	    
+	pdiv = div.find('div', attrs={'class':'player-bio'})
+	if not pdiv:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return
+	# now output.
+	irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
+
+    mlbplayerinfo = wrap(mlbplayerinfo, [('text')])
+
+
     def mlbgamestats(self, irc, msg, args, optplayer):
         """<player name>
 
