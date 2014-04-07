@@ -1371,11 +1371,10 @@ class MLB(callbacks.Plugin):
 	# container
 	mlbdailyleaders = []
 	# iterate over each row.
-	for row in rows[0:10]:
+	for (i, row) in enumerate(rows[0:10]):
 	    tds = row.findAll('td')
-	    num = tds[0].getText()
 	    plr = tds[1].getText().encode('utf-8')
-	    mlbdailyleaders.append("{0}. {1}".format(num, plr))
+	    mlbdailyleaders.append("{0}. {1}".format(i+1, plr))
 	# now output.
 	irc.reply("{0} :: {1}".format(self._bold(mlbdate.getText()), " ".join([i for i in mlbdailyleaders])))
     
