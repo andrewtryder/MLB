@@ -549,56 +549,6 @@ class MLB(callbacks.Plugin):
 
     mlbcyyoung = wrap(mlbcyyoung)
 
-    def mlbtrademachine(self, irc, msg, args):
-        """
-        Use Elkund-like powers to generate a trade between two teams.
-        """
-
-        # our array to pickfrom. references yahoo.
-        teams = [
-            'bal', 'bos', 'chw', 'cle', 'det', 'hou',
-            'kan', 'laa', 'min', 'nyy', 'oak', 'sea',
-            'tam', 'tex', 'ari', 'atl', 'chc', 'cin',
-            'col', 'lad', 'mia', 'mil', 'nym', 'phi',
-            'pit', 'sdg', 'sfo', 'stl', 'was', 'tor' ]
-
-        twoteams = random.sample(teams, 2)  # grab two teams, randomly.
-        #twoteamplayers = collections.defaultdict()  # setup defaultdict for team = key, values = players
-        twoteamplayers = collections.defaultdict(list)
-        # now we go to each team's roster and fill them up.
-        for pickTeam in twoteams:
-            # create url and fetch
-            url = self._b64decode('aHR0cDovL3Nwb3J0cy55YWhvby5jb20vbWxiL3RlYW1z') + '/%s/roster' % pickTeam
-            html = self._httpget(url)
-            if not html:
-                irc.reply("ERROR: Failed to fetch {0}.".format(url))
-                self.log.error("ERROR opening {0}".format(url))
-                return
-            # now process the html.
-            soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-            bbteam = soup.find('div', attrs={'class':'info'}).find('h1', attrs={'itemprop':'name'})
-            #div = soup.find('div', attrs={'id':'team-roster'})  # roster div
-            rows = soup.findAll('th', attrs={'class':'title', 'scope':'row'})
-            # each row is a player.
-            for row in rows:
-                player = row.getText().encode('utf-8')  # players are last, first. we split+encode below.
-                playersplit = player.split(',', 1)  # split on last, first so we can reverse below.
-                player = "{0} {1}".format(playersplit[1].strip(), playersplit[0].strip())
-                twoteamplayers[bbteam.getText()].append(player)
-        # now we need to pick the player(s)
-        outlist = []  # list will store: 0. team 1. players 2. team 3. players.
-        for x, y in twoteamplayers.iteritems():
-            randnum = random.randint(1, 3)  # number of players. 1-3
-            randplayers = random.sample(y, randnum)  # use to randomly fetch players.
-            outlist.append(x)  # append team.
-            outlist.append(", ".join(randplayers))  # append player(s)
-        # finally, output.
-        output = "{0} :: The {1} trade {2} to the {3} for {4}".format(self._red("MLB TRADE MACHINE"),\
-                self._bu(outlist[0]), self._bold(outlist[1]), self._bu(outlist[2]), self._bold(outlist[3]))
-        irc.reply(output)
-
-    mlbtrademachine = wrap(mlbtrademachine)
-
     def mlbseries(self, irc, msg, args, optteam, optopp):
         """<team> <opp>
         Display the remaining games between TEAM and OPP in the current schedule.
