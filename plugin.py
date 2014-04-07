@@ -1044,7 +1044,9 @@ class MLB(callbacks.Plugin):
     def mlbleaders(self, irc, msg, args, optlist, optleague, optstat):
         """<mlb|nl|al> <statname>
 	
-        Display MLB leaders in various stat categories.
+        Display MLB/AL/NL leaders in various stat categories.
+	Valid categories: AVG, HR, RBI, R, OBP, SLUGGING, OPS, SB, W, ERA, SO, S, WHIP
+	
 	Ex: mlb ops
         """
 
