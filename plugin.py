@@ -251,9 +251,9 @@ class MLB(callbacks.Plugin):
 
     mlbchanlineup = wrap(mlbchanlineup)
 
-    def mlbstreaks(self, irc, msg, args):
+    def mlbhittingstreaks(self, irc, msg, args):
         """
-        Display this year's longest hitstreaks.
+        Display this year's longest hitstreaks in AL and NL.
         """
 
         # build and fetch url.
@@ -283,7 +283,7 @@ class MLB(callbacks.Plugin):
         for i, x in mlbstreaks.items():
             irc.reply("{0} :: {1}".format(self._bold(i), " | ".join(x)))
 
-    mlbstreaks = wrap(mlbstreaks)
+    mlbhittingstreaks = wrap(mlbhittingstreaks)
 
     def mlbplayoffchances(self, irc, msg, args, optteam):
         """<team>
