@@ -1422,6 +1422,31 @@ class MLB(callbacks.Plugin):
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
+    def _rplayerfind(self, pname):
+        """Find a player's page via google ajax.."""
+
+        # construct url (properly escaped)
+        pname = "%s site:www.rotoworld.com/player/mlb/" % pname
+        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % pname.replace(' ', '%20')
+        # now fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # load the json.
+        jsonf = json.loads(html)
+        # make sure status is 200.
+        if jsonf['responseStatus'] != 200:
+            return None
+        # make sure we have results.
+        results = jsonf['responseData']['results']
+        if len(results) == 0:
+            return None
+        # finally, return the url.
+        url = results[0]['url']
+        return url
+
     def _eplayerfind(self, pname):
         """Find a player's page via google ajax.."""
 
