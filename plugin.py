@@ -1472,6 +1472,80 @@ class MLB(callbacks.Plugin):
         url = results[0]['url']
         return url
 
+    def mlbplayercontract(self, irc, msg, args, optplayer):
+        """<player name>
+	
+	Display known contract details for active player.
+        Ex: Derek Jeter.
+        """
+
+        # try and grab a player.
+        url = self._rplayerfind(optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.find('div', attrs={'class':'playername'})
+	if not plrname:
+	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+	    return
+	else:  # grab their name and stuff.
+	    plrname = plrname.find('h1').getText().encode('utf-8')
+	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+	# now find the n00z.
+	div = soup.find('div', attrs={'class':'report'})
+	if not div:
+	    irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
+	    return
+	# we do have stuff. output.
+	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+	
+    mlbplayercontract = wrap(mlbplayercontract, [('text')])
+
+    def mlbplayernews(self, irc, msg, args, optplayer):
+        """<player name>
+	
+	Display latest news for player via Rotoworld.
+        Ex: Derek Jeter.
+        """
+
+        # try and grab a player.
+        url = self._rplayerfind(optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.find('div', attrs={'class':'playername'})
+	if not plrname:
+	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+	    return
+	else:  # grab their name and stuff.
+	    plrname = plrname.find('h1').getText().encode('utf-8')
+	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+	# now find the n00z.
+	div = soup.find('div', attrs={'class':'playernews'})
+	if not div:
+	    irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
+	    return
+	# we do have stuff. output.
+	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+	
+    mlbplayernews = wrap(mlbplayernews, [('text')])
+
     def mlbcareerstats(self, irc, msg, args, optplayer):
         """<player name>
 	
@@ -1492,7 +1566,6 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return None
-        # process html.
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
 	plrname = soup.findAll('h1')[1].getText().encode('utf-8')
