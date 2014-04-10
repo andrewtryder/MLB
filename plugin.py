@@ -387,7 +387,11 @@ class MLB(callbacks.Plugin):
             pitcherpres = soup.findAll('th', text='Pitchers')
             # defaultdict to put key: team value: pitchers.
             teampitchers = collections.defaultdict()
-            # should be two, one per team.
+	    # maybe later? broken for now. before we handle the pitchers, get the "game status"
+	    #gamestatus = soup.find('div', attrs={'id':'gameStatusBarWrap'})  # div should have game status + series.
+	    #gs = gamestatus.getText(separator=' ').encode('utf-8')  # grab the text.
+	    #teampitchers.setdefault(str(optteam), []).append(gs)  # append it.
+            # now, find the pitchers. should be two, one per team+ (relievers).
             if len(pitcherpres) != 2:  # game is too far from starting.
                 if "Box Score not available." in html:  # sometimes the boxscore is not up.
                     pstring = "Box Score not available."
@@ -432,7 +436,7 @@ class MLB(callbacks.Plugin):
                                                                                  pitcherso, pitcherhr, pitcherpcst, \
                                                                                  pitcherera)
                         teampitchers.setdefault(str(team), []).append(pstring)  # append into dict.
-            # now, lets attempt to output.
+	    # now, lets attempt to output.
             output = teampitchers.get(optteam, None)
             if not output:  # something went horribly wrong if we're here.
                 irc.reply("ERROR: No pitchers found for {0}. Check when the game is active or finished, not before.".format(optteam))
