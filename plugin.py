@@ -1577,9 +1577,9 @@ class MLB(callbacks.Plugin):
 	    irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
 	    return
 	# first row has two 2ds. lets list cmp this with some nifty one liner!.
-	careertotals = [colhead[i+2].getText() + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
+	careertotals = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
 	# 2nd row has one td but colspan=2. same deal.
-	seasonavg = [colhead[i+2].getText() + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
+	seasonavg = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
         # output time.
         irc.reply("{0} :: Season Averages :: {1}".format(self._bold(plrname), " | ".join([i for i in seasonavg])))
         irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
