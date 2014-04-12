@@ -1575,7 +1575,7 @@ class MLB(callbacks.Plugin):
 	plrname = soup.findAll('h1')[1].getText().encode('utf-8')
 	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
 	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-	trs = table.findAll('tr', attrs={'class':'oddrow bi'})
+	trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
 	#
 	if len(trs) != 2:
 	    irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
