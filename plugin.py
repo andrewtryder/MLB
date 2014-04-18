@@ -328,6 +328,81 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} chances :: {1}".format(self._red(optteam), output))
 
     mlbplayoffchances = wrap(mlbplayoffchances, [('somethingWithoutSpaces')])
+    
+    def mlbbox(self, irc, msg, args, optteam):
+	"""<team>
+	
+	Displays current box store, if any, for game the team is in or played.
+	Ex: NYY
+	"""
+
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if not optteam:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # build url and fetch scoreboard.
+        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process scoreboard.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        games = soup.findAll('div', attrs={'id': re.compile('.*?-gamebox')})
+        # container to put all of the teams in.
+        teamdict = {}
+        # process each "game" (two teams in each)
+        for game in games:
+            teams = game.findAll('p', attrs={'class':'team-name'})
+            for team in teams:  # each game has two teams.
+		tt = team.find('a')
+		if tt:
+		    ahref = team.find('a')['href']
+		    teamname = ahref.split('/')[7].lower()  # will be lowercase.
+		    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+		    # now lets grab the rest. first, the status.
+		    gmstatus = game.find('div', attrs={'class':'game-status'})
+		    tempd = {}  # lets also make a temp dict.
+		    tempd["status"] = gmstatus.getText()   # add in the text.
+		    two = ['away', 'home']  # iterate through these two.
+		    for one in two:  # iterate over these two.
+			finddiv = game.find('div', attrs={'class':'team ' + one})  # use slice.
+			findteam = finddiv.find('p', attrs={'class':'team-name'})  # name of team.
+			findrec = finddiv.find('p', attrs={'class':'record'})  # name of team.
+			# box score part.
+			findscore = finddiv.find('ul', attrs={'class':'score'})
+			findruns = findscore.find('li', attrs={'id':re.compile('.*?T$')})
+			findhits = findscore.find('li', attrs={'id':re.compile('.*?H$')})
+			finderrors = findscore.find('li', attrs={'id':re.compile('.*?E$')})
+			# now lets inject some of this into our temp dict, which winds up in the main.
+			tempd[one + "team"] = findteam.getText()
+			tempd[one + "record"] = findrec.getText()
+			tempd[one + "runs"] = findruns.getText()
+			# conditionals here if the game has not started.
+			if findhits:
+			    tempd[one + "hits"] = findhits.getText()
+			else:
+			    tempd[one + "hits"] = 0
+			if finderrors:
+			    tempd[one + "errors"] = finderrors.getText()
+			else:
+			    tempd[one + "errors"] = 0
+		    # now append the "status" or "score" to the defaultdict.
+		    teamdict[str(teamname)] = tempd
+        # grab the gameid. fetch.
+        bs = teamdict.get(optteam)
+        # sanity check before we grab the game.
+        if not bs:
+            irc.reply("ERROR: No upcoming/active games with: {0}. Perhaps they're not playing today?".format(optteam))
+            return
+	# if we're here, its time to output. 3 lines.
+	irc.reply("{0:22} {1:<2} {2:<2} {3:<2}".format(self._bold(bs['status']), "R", "H", "E"))
+	irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['awayteam'], bs['awayruns'], bs['awayhits'], bs['awayerrors']))
+	irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['hometeam'], bs['homeruns'], bs['homehits'], bs['homeerrors']))
+    
+    mlbbox = wrap(mlbbox, [('somethingWithoutSpaces')])
 
     def mlbpitcher(self, irc, msg, args, optteam):
         """<team>
@@ -1895,6 +1970,7 @@ class MLB(callbacks.Plugin):
 	# sanity check.
 	if "No lineup yet" in lineup.getText():
 	    irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
+	    return
 	else:  # div is a collection of divs, each div = person in lineup.
 	    lineup = lineup.findAll('div')
 	    lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
