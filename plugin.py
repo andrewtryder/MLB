@@ -1501,12 +1501,26 @@ class MLB(callbacks.Plugin):
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
-    def _rplayerfind(self, pname):
-        """Find a player's page via google ajax.."""
+    def _pf(self, db, pname):
+        """<e|r|s> <player>
+        
+        Find a player's page via google ajax. Specify DB based on site.
+        """
 
+        # first, figure out the site based on db string.
+        # quote_plus(search_term)
+        # urllib.urlencode({'q':searchfor})
+        # try urlencode pname.
+        #pname = utils.web.urlencode(pname)
+        # db.
+        if db == "e":  # espn.
+            burl = "%s site:espn.go.com/mlb/player/" % pname
+        elif db == "r":  # rworld.
+            burl = "%s site:www.rotoworld.com/player/mlb/" % pname
+        elif db == "s":  # st.
+            burl = "%s site:www.spotrac.com/mlb/" % pname
         # construct url (properly escaped)
-        pname = "%s site:www.rotoworld.com/player/mlb/" % pname
-        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % pname.replace(' ', '%20')
+        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % burl.replace(' ', '%20')
         # now fetch url.
         html = self._httpget(url)
         if not html:
@@ -1522,32 +1536,7 @@ class MLB(callbacks.Plugin):
         results = jsonf['responseData']['results']
         if len(results) == 0:
             return None
-        # finally, return the url.
-        url = results[0]['url']
-        return url
-
-    def _eplayerfind(self, pname):
-        """Find a player's page via google ajax.."""
-
-        # construct url (properly escaped)
-        pname = "%s site:espn.go.com/mlb/player/" % pname
-        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % pname.replace(' ', '%20')
-        # now fetch url.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # load the json.
-        jsonf = json.loads(html)
-        # make sure status is 200.
-        if jsonf['responseStatus'] != 200:
-            return None
-        # make sure we have results.
-        results = jsonf['responseData']['results']
-        if len(results) == 0:
-            return None
-        # finally, return the url.
+        # finally, return the first url.
         url = results[0]['url']
         return url
 
@@ -1559,7 +1548,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._rplayerfind(optplayer)
+        url = self._pf('r', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
@@ -1596,7 +1585,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._rplayerfind(optplayer)
+        url = self._pf('r', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
@@ -1633,7 +1622,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._eplayerfind(optplayer)
+        url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
@@ -1673,7 +1662,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._eplayerfind(optplayer)
+        url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
@@ -1732,7 +1721,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._eplayerfind(optplayer)
+        url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
@@ -1770,7 +1759,7 @@ class MLB(callbacks.Plugin):
         """
 
         # try and grab a player.
-        url = self._eplayerfind(optplayer)
+        url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
             return
