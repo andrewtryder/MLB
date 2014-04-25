@@ -1501,314 +1501,6 @@ class MLB(callbacks.Plugin):
 
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
 
-    def _pf(self, db, pname):
-        """<e|r|s> <player>
-        
-        Find a player's page via google ajax. Specify DB based on site.
-        """
-
-        # first, figure out the site based on db string.
-        # quote_plus(search_term)
-        # urllib.urlencode({'q':searchfor})
-        # try urlencode pname.
-        #pname = utils.web.urlencode(pname)
-        # db.
-        if db == "e":  # espn.
-            burl = "%s site:espn.go.com/mlb/player/" % pname
-        elif db == "r":  # rworld.
-            burl = "%s site:www.rotoworld.com/player/mlb/" % pname
-        elif db == "s":  # st.
-            burl = "%s site:www.spotrac.com/mlb/" % pname
-        # construct url (properly escaped)
-        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % burl.replace(' ', '%20')
-        # now fetch url.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # load the json.
-        jsonf = json.loads(html)
-        # make sure status is 200.
-        if jsonf['responseStatus'] != 200:
-            return None
-        # make sure we have results.
-        results = jsonf['responseData']['results']
-        if len(results) == 0:
-            return None
-        # finally, return the first url.
-        url = results[0]['url']
-        return url
-
-    def mlbplayercontract(self, irc, msg, args, optplayer):
-        """<player name>
-	
-	Display known contract details for active player.
-        Ex: Derek Jeter.
-        """
-
-        # try and grab a player.
-        url = self._pf('r', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.find('div', attrs={'class':'playername'})
-	if not plrname:
-	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
-	    return
-	else:  # grab their name and stuff.
-	    plrname = plrname.find('h1').getText().encode('utf-8')
-	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
-	# now find the n00z.
-	div = soup.find('div', attrs={'class':'report'})
-	if not div:
-	    irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
-	    return
-	# we do have stuff. output.
-	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
-	
-    mlbplayercontract = wrap(mlbplayercontract, [('text')])
-
-    def mlbplayernews(self, irc, msg, args, optplayer):
-        """<player name>
-	
-	Display latest news for player via Rotoworld.
-        Ex: Derek Jeter.
-        """
-
-        # try and grab a player.
-        url = self._pf('r', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.find('div', attrs={'class':'playername'})
-	if not plrname:
-	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
-	    return
-	else:  # grab their name and stuff.
-	    plrname = plrname.find('h1').getText().encode('utf-8')
-	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
-	# now find the n00z.
-	div = soup.find('div', attrs={'class':'playernews'})
-	if not div:
-	    irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
-	    return
-	# we do have stuff. output.
-	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
-	
-    mlbplayernews = wrap(mlbplayernews, [('text')])
-
-    def mlbcareerstats(self, irc, msg, args, optplayer):
-        """<player name>
-	
-        Display career totals and season averages for player.
-        Ex: Don Mattingly or Rickey Henderson or Derek Jeter.
-        """
-
-        # try and grab a player.
-        url = self._pf('e', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-	# mangle url
-	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.findAll('h1')[1].getText().encode('utf-8')
-	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
-	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-	trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
-	#
-	if len(trs) != 2:
-	    irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
-	    return
-	# first row has two 2ds. lets list cmp this with some nifty one liner!.
-	careertotals = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
-	# 2nd row has one td but colspan=2. same deal.
-	seasonavg = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
-        # output time.
-        irc.reply("{0} :: Season Averages :: {1}".format(self._bold(plrname), " | ".join([i for i in seasonavg])))
-        irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
-
-    mlbcareerstats = wrap(mlbcareerstats, [('text')])
-
-    def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
-        """<year> <player name>
-
-        Fetch season stats for player.
-        Ex: 2010 Derek Jeter
-        """
-
-        # try and grab a player.
-        url = self._pf('e', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-	# now replace the url so we can grab stats.
-	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
-	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
-	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
-	# sanity check
-	if len(trs) == 0:
-	    print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
-	# container
-	st = collections.defaultdict(list)
-	# iterate over their stats.
-	for tr in trs:
-	    tds = tr.findAll('td')
-	    yr = tds[0].getText()
-	    tmp = {}  # tmp dict
-	    for (i, z) in enumerate(tds[1:]):  # mate them up with colhead. +1
-		tmp[colhead[i+1].getText()] = z.getText()  # inject.
-	    # once done, append tmp to st.
-	    st[int(yr)].append(tmp)
-	# now lets grab the year.
-	outstat = st.get(optyear)
-	# make sure we have that year.
-	if not outstat:
-	    irc.reply("ERROR: I did not find stats for {0} in {1}.".format(plrname, optyear))
-	    return
-	# lets format output.
-	outstr = []
-	# iterate over each item in the year.
-	for q in outstat:  # each item here is going to be a dictionary.
-	    outstr.append("{0}".format(self._ul(q['TEAM'])))
-	    for (k, v) in q.items():
-		if k != 'TEAM':  # team injected above
-		    outstr.append("{0}: {1}".format(self._bold(k), v))
-	# finally, output
-	irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
-    
-    mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
-
-    def mlbplayerinfo(self, irc, msg, args, optplayer):
-        """<player name>
-
-        Fetch gamestats for player from current or past game.
-        Ex: Derek Jeter
-        """
-
-        # try and grab a player.
-        url = self._pf('e', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	div = soup.find('div', attrs={'class':'mod-content'})
-	if not div:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return
-	# find their name.
-	pname = div.find('h1')
-	if not pname:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return	    
-	pdiv = div.find('div', attrs={'class':'player-bio'})
-	if not pdiv:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return
-	# now output.
-	irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
-
-    mlbplayerinfo = wrap(mlbplayerinfo, [('text')])
-
-    def mlbgamestats(self, irc, msg, args, optplayer):
-        """<player name>
-
-        Fetch gamestats for player from current or past game.
-        Ex: Derek Jeter
-        """
-
-        # try and grab a player.
-        url = self._pf('e', optplayer)
-        if not url:
-            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            return
-        # we do have url now. fetch it.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return None
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
-        maintable = soup.find('table', attrs={'class':'player-profile-container'})
-	mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
-	# have to look at what's in mtheader to determine the statline.
-	if 'PREVIOUS GAME' in mtheader:  # previous game.
-	    # find the details of the previous game.
-	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
-	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-	    prevgametable = maintable.find('table', attrs={'class':'tablehead'})
-	    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
-            prevgame = prevgametable.findAll('tr')[1].findAll('td')
-	    if prevgame[0].getText() != "This Game":
-		irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
-		return
-            statline = [self._bold(prevcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
-	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " | ".join(statline)))
-	elif "CURRENT GAME" in mtheader:
-	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
-	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-	    curgametable = maintable.find('table', attrs={'class':'tablehead'})
-	    curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
-            curgame = curgametable.findAll('tr')[1].findAll('td')
-	    if curgame[0].getText() != "This Game":
-		irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
-		return
-            statline = [self._bold(curcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(curgame[1:])]
-	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " | ".join(statline)))
-	else:
-	    irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
-
-    mlbgamestats = wrap(mlbgamestats, [('text')])
-
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW|ALWC|NLWC>
 
@@ -2289,6 +1981,343 @@ class MLB(callbacks.Plugin):
                     eachentry['vteam'], eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats']))
 
     mlbprob = wrap(mlbprob, [('somethingWithoutSpaces')])
+
+    #############################
+    # PLAYER FIND / STATS STUFF #
+    #############################
+
+    def _pf(self, db, pname):
+        """<e|r|s> <player>
+        
+        Find a player's page via google ajax. Specify DB based on site.
+        """
+
+        # first, figure out the site based on db string.
+        # quote_plus(search_term)
+        # urllib.urlencode({'q':searchfor})
+        # try urlencode pname.
+        #pname = utils.web.urlencode(pname)
+        # db.
+        if db == "e":  # espn.
+            burl = "%s site:espn.go.com/mlb/player/" % pname
+        elif db == "r":  # rworld.
+            burl = "%s site:www.rotoworld.com/player/mlb/" % pname
+        elif db == "s":  # st.
+            burl = "%s site:www.spotrac.com/mlb/" % pname
+        # construct url (properly escaped)
+        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % burl.replace(' ', '%20')
+        # now fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # load the json.
+        jsonf = json.loads(html)
+        # make sure status is 200.
+        if jsonf['responseStatus'] != 200:
+            return None
+        # make sure we have results.
+        results = jsonf['responseData']['results']
+        if len(results) == 0:
+            return None
+        # finally, return the first url.
+        url = results[0]['url']
+        return url
+
+    def _so(self, d):
+	"""<dict> 
+	
+	Input dict of stats. Order them properly.
+	"""
+    
+	so = ['GP','AB','AVG','HR','RBI','SB','CS','R','H','2B','3B','OBP','SLG','OPS','BB','SO',
+	      'IP','W','L','SV','ERA','WHIP','BB','SO','H','HR','HLD','BLSV','R','CG','SHO','WAR']
+	# one liner is always better.
+	o = [self._bold(v) + ": " + d[v] for v in so if v in d]
+	# we return the list.
+	return o
+
+    def mlbplayercontract(self, irc, msg, args, optplayer):
+        """<player name>
+	
+	Display known contract details for active player.
+        Ex: Derek Jeter.
+        """
+
+        # try and grab a player.
+        url = self._pf('r', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.find('div', attrs={'class':'playername'})
+	if not plrname:
+	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+	    return
+	else:  # grab their name and stuff.
+	    plrname = plrname.find('h1').getText().encode('utf-8')
+	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+	# now find the n00z.
+	div = soup.find('div', attrs={'class':'report'})
+	if not div:
+	    irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
+	    return
+	# we do have stuff. output.
+	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+	
+    mlbplayercontract = wrap(mlbplayercontract, [('text')])
+
+    def mlbplayernews(self, irc, msg, args, optplayer):
+        """<player name>
+	
+	Display latest news for player via Rotoworld.
+        Ex: Derek Jeter.
+        """
+
+        # try and grab a player.
+        url = self._pf('r', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.find('div', attrs={'class':'playername'})
+	if not plrname:
+	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+	    return
+	else:  # grab their name and stuff.
+	    plrname = plrname.find('h1').getText().encode('utf-8')
+	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+	# now find the n00z.
+	div = soup.find('div', attrs={'class':'playernews'})
+	if not div:
+	    irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
+	    return
+	# we do have stuff. output.
+	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+	
+    mlbplayernews = wrap(mlbplayernews, [('text')])
+
+    def mlbcareerstats(self, irc, msg, args, optplayer):
+        """<player name>
+	
+        Display career totals and season averages for player.
+        Ex: Don Mattingly or Rickey Henderson or Derek Jeter.
+        """
+
+        # try and grab a player.
+        url = self._pf('e', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+	# mangle url
+	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.findAll('h1')[1].getText().encode('utf-8')
+	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+	trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
+	#
+	if len(trs) != 2:
+	    irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
+	    return
+	# first row has two 2ds. lets list cmp this with some nifty one liner!.
+	#careertotals = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
+	#seasonavg = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
+	careertotals = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[0].findAll('td')[2:])}
+	seasonavg = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[1].findAll('td')[1:])}
+	seasonavg = self._so(seasonavg)  # format both.
+	careertotals = self._so(careertotals)
+        # output time.
+        irc.reply("{0} :: Season Averages :: {1}".format(self._bold(plrname), " | ".join([i for i in seasonavg])))
+        irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
+
+    mlbcareerstats = wrap(mlbcareerstats, [('text')])
+
+    def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
+        """<year> <player name>
+
+        Fetch season stats for player.
+        Ex: 2010 Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._pf('e', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+	# now replace the url so we can grab stats.
+	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
+	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
+	# sanity check
+	if len(trs) == 0:
+	    print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
+	# container
+	st = collections.defaultdict(list)
+	# iterate over their stats.
+	for tr in trs:
+	    tds = tr.findAll('td')
+	    yr = tds[0].getText()
+	    tmp = {}  # tmp dict
+	    for (i, z) in enumerate(tds[1:]):  # mate them up with colhead. +1
+		tmp[colhead[i+1].getText()] = z.getText()  # inject.
+	    # once done, append tmp to st.
+	    st[int(yr)].append(tmp)
+	# now lets grab the year.
+	outstat = st.get(optyear)
+	# make sure we have that year.
+	if not outstat:
+	    irc.reply("ERROR: I did not find stats for {0} in {1}.".format(plrname, optyear))
+	    return
+	# lets format output.
+	outstr = []
+	# iterate over each item in the year.
+	for q in outstat:  # each item here is going to be a dictionary.
+	    outstr.append("{0}".format(self._ul(q['TEAM'])))
+	    # we do this a little different than normal stats.
+	    #for (k, v) in q.items():  # stat items.
+	    #	if k != 'TEAM':  # team injected above
+	    #		outstr.append("{0}: {1}".format(self._bold(k), v))
+	    t = {k: v for (k, v) in q.items() if k != 'TEAM'}  # put in dict.
+	    t = self._so(t)  # format it.
+	    outstr.extend(t)  # must extend (not append) list
+	# finally, output
+	irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
+    
+    mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
+
+    def mlbplayerinfo(self, irc, msg, args, optplayer):
+        """<player name>
+
+        Fetch gamestats for player from current or past game.
+        Ex: Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._pf('e', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	div = soup.find('div', attrs={'class':'mod-content'})
+	if not div:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return
+	# find their name.
+	pname = div.find('h1')
+	if not pname:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return	    
+	pdiv = div.find('div', attrs={'class':'player-bio'})
+	if not pdiv:
+	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+	    return
+	# now output.
+	irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
+
+    mlbplayerinfo = wrap(mlbplayerinfo, [('text')])
+
+    def mlbgamestats(self, irc, msg, args, optplayer):
+        """<player name>
+
+        Fetch gamestats for player from current or past game.
+        Ex: Derek Jeter
+        """
+
+        # try and grab a player.
+        url = self._pf('e', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
+        maintable = soup.find('table', attrs={'class':'player-profile-container'})
+	mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
+	# have to look at what's in mtheader to determine the statline. we could probably consolidate this but
+	# its easier for me when I have to debug these.
+	if 'PREVIOUS GAME' in mtheader:  # previous game.
+	    # find the details of the previous game.
+	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
+	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
+	    prevgametable = maintable.find('table', attrs={'class':'tablehead'})
+	    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            prevgame = prevgametable.findAll('tr')[1].findAll('td')
+	    if prevgame[0].getText() != "This Game":
+		irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
+		return
+            #statline = [self._bold(prevcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
+	    statline = {prevcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(prevgame[1:])}
+	    statline = self._so(statline)	    
+	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
+	elif "CURRENT GAME" in mtheader:
+	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
+	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
+	    curgametable = maintable.find('table', attrs={'class':'tablehead'})
+	    curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            curgame = curgametable.findAll('tr')[1].findAll('td')
+	    if curgame[0].getText() != "This Game":
+		irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
+		return
+            #statline = [self._bold(curcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(curgame[1:])]
+	    statline = {curcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(curgame[1:])}
+	    statline = self._so(statline)
+	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
+	else:
+	    irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
+
+    mlbgamestats = wrap(mlbgamestats, [('text')])
 
 Class = MLB
 
