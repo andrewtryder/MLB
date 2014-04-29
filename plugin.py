@@ -16,6 +16,8 @@ import json
 from itertools import groupby, count
 import os.path
 from base64 import b64decode
+import jellyfish  # similar players.
+from operator import itemgetter  # similar players.
 # supybot libs.
 import supybot.utils as utils
 from supybot.commands import *
@@ -1986,6 +1988,69 @@ class MLB(callbacks.Plugin):
     # PLAYER FIND / STATS STUFF #
     #############################
 
+    def _sanitizeName(self, name):
+        """ Sanitize name. """
+
+        name = name.lower()  # lower.
+        name = name.strip('.')  # remove periods.
+        name = name.strip('-')  # remove dashes.
+        name = name.strip("'")  # remove apostrophies.
+        # possibly strip jr/sr/III suffixes in here?
+        return name
+
+    def _similarPlayers(self, optname):
+        """Return a dict containing the five most similar players based on optname."""
+
+        url = self._b64decode('aHR0cHM6Ly9lcmlrYmVyZy5jb20vbWxiL3BsYXllcnM=')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.info("ERROR opening {0}".format(url))
+            return None
+        # now that we have the list, lets parse the json.
+        try:
+	    soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+	    table = soup.find('table')
+	    # do a sanity check.
+	    trs = table.find('tbody').findAll('tr')
+	    activeplayers = []
+	    # iterate over each row.
+	    for tr in trs:
+	        tds = tr.findAll('td')
+	        i = tds[0].getText().replace('.', '')  # id.
+	        n = tds[1].find('a').getText().encode('utf-8')  # name.
+	        activeplayers.append({'id':i, 'full_name':n})
+        except Exception, e:
+            self.log.info("ERROR: _similarPlayers :: Could not parse source for players :: {0}".format(e))
+            return None
+        # test length as sanity check.
+        if len(activeplayers) == 0:
+            self.log.info("ERROR: _similarPlayers :: length 0. Could not find any players in players source")
+            return None
+        # ok, finally, lets go.
+        optname = self._sanitizeName(optname)  # sanitizename.
+        jaro, damerau = [], []  # empty lists to put our results in.
+        # now we create the container to iterate over.
+        names = [{'fullname': self._sanitizeName(v['full_name']), 'id':v['id']} for v in activeplayers]  # full_name # last_name # first_name
+        # iterate over the entries.
+        for row in names:  # list of dicts.
+            jaroscore = jellyfish.jaro_distance(optname, row['fullname'])  # jaro.
+            damerauscore = jellyfish.damerau_levenshtein_distance(optname, row['fullname'])  #dld
+            jaro.append({'jaro':jaroscore, 'fullname':row['fullname'], 'id':row['id']})  # add dict to list.
+            damerau.append({'damerau':damerauscore, 'fullname':row['fullname'], 'id':row['id']})  # ibid.
+        # now, we do two "sorts" to find the "top5" matches. reverse is opposite on each.
+        jarolist = sorted(jaro, key=itemgetter('jaro'), reverse=True)[0:5]  # bot five.
+        dameraulist = sorted(damerau, key=itemgetter('damerau'), reverse=False)[0:5]  # top five.
+        # we now have two lists, top5 sorted, and need to do some further things.
+        # now, lets iterate through both lists. match if both are in it. (better matches)
+        matching = [k for k in jarolist if k['id'] in [f['id'] for f in dameraulist]]
+        # now, test if we have anything. better matches will have more.
+        if len(matching) == 0:  # we have NO matches. grab the top two from jaro/damerau (for error str)
+            matching = [jarolist[0], dameraulist[0], jarolist[1], dameraulist[1]]
+            self.log.info("_similarPlayers :: NO MATCHES for {0} :: {1}".format(optname, matching))
+        # return matching now.
+        return matching
+
     def _pf(self, db, pname):
         """<e|r|s> <player>
         
@@ -2049,6 +2114,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('r', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
         # we do have url now. fetch it.
         html = self._httpget(url)
@@ -2086,6 +2156,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('r', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
         # we do have url now. fetch it.
         html = self._httpget(url)
@@ -2123,6 +2198,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
 	# mangle url
 	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
@@ -2166,6 +2246,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
 	# now replace the url so we can grab stats.
 	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
@@ -2229,6 +2314,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
         # we do have url now. fetch it.
         html = self._httpget(url)
@@ -2267,6 +2357,11 @@ class MLB(callbacks.Plugin):
         url = self._pf('e', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
             return
         # we do have url now. fetch it.
         html = self._httpget(url)
