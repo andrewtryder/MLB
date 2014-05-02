@@ -2106,7 +2106,7 @@ class MLB(callbacks.Plugin):
     def mlbplayercontract(self, irc, msg, args, optplayer):
         """<player name>
 	
-	Display known contract details for active player.
+		Display known contract details for active player.
         Ex: Derek Jeter.
         """
 
@@ -2148,7 +2148,7 @@ class MLB(callbacks.Plugin):
     def mlbplayernews(self, irc, msg, args, optplayer):
         """<player name>
 	
-	Display latest news for player via Rotoworld.
+		Display latest news for player via Rotoworld.
         Ex: Derek Jeter.
         """
 
@@ -2306,7 +2306,7 @@ class MLB(callbacks.Plugin):
     def mlbplayerinfo(self, irc, msg, args, optplayer):
         """<player name>
 
-        Fetch gamestats for player from current or past game.
+        Display information about MLB player.
         Ex: Derek Jeter
         """
 
