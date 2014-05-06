@@ -33,56 +33,56 @@ class MLB(callbacks.Plugin):
     """Add the help for "@plugin help MLB" here
     This should describe *how* to use this plugin."""
     threaded = True
-
+    
     def __init__(self, irc):
         self.__parent = super(MLB, self)
         self.__parent.__init__(irc)
         self._mlbdb = os.path.abspath(os.path.dirname(__file__)) + '/db/mlb.db'
-
+    
     def die(self):
         self.__parent.die()
-
+    
     ##############
     # FORMATTING #
     ##############
-
+    
     def _red(self, string):
         """Returns a red string."""
         return ircutils.mircColor(string, 'red')
-
+    
     def _yellow(self, string):
         """Returns a yellow string."""
         return ircutils.mircColor(string, 'yellow')
-
+    
     def _green(self, string):
         """Returns a green string."""
         return ircutils.mircColor(string, 'green')
-
+    
     def _bold(self, string):
         """Returns a bold string."""
         return ircutils.bold(string)
-
+    
     def _blue(self, string):
         """Returns a blue string."""
         return ircutils.mircColor(string, 'blue')
-
+    
     def _ul(self, string):
         """Returns an underline string."""
         return ircutils.underline(string)
-
+    
     def _bu(self, string):
         """Returns a bold/underline string."""
         return ircutils.bold(ircutils.underline(string))
-
-	######################
-	# INTERNAL FUNCTIONS #
-	######################
-
+    
+    ######################
+    # INTERNAL FUNCTIONS #
+    ######################
+    
     def _splicegen(self, maxchars, stringlist):
         """Return a group of splices from a list based on the maxchars
         string-length boundary.
         """
-
+    
         runningcount = 0
         tmpslice = []
         for i, item in enumerate(stringlist):
@@ -94,84 +94,84 @@ class MLB(callbacks.Plugin):
                 tmpslice = [i]
                 runningcount = len(item)
         yield(tmpslice)
-
+    
     def _batch(self, iterable, size):
         """http://code.activestate.com/recipes/303279/#c7"""
-
+    
         c = count()
         for k, g in groupby(iterable, lambda x:c.next()//size):
             yield g
-
+    
     def _validate(self, date, format):
         """Return true or false for valid date based on format."""
-
+    
         try:
             datetime.datetime.strptime(str(date), format) # format = "%m/%d/%Y"
             return True
         except ValueError:
             return False
-
+    
     def _httpget(self, url, h=None, d=None, l=True):
         """General HTTP resource fetcher. Pass headers via h, data via d, and to log via l."""
-
+    
         if self.registryValue('logURLs') and l:
             self.log.info(url)
-
+    
         try:
             if h and d:
                 page = utils.web.getUrl(url, headers=h, data=d)
             else:
-		h = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
+                h = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
                 page = utils.web.getUrl(url, headers=h)
             return page
         except Exception as e:
             self.log.error("ERROR opening {0} message: {1}".format(url, e))
             return None
-
+    
     def _b64decode(self, string):
         """Returns base64 decoded string."""
-
+    
         return b64decode(string)
-
+    
     def _dtFormat(self, outfmt, instring, infmt):
         """Convert from one dateformat to another."""
-
+    
         try:
             d = datetime.datetime.strptime(instring, infmt)
             output = d.strftime(outfmt)
         except:
             output = instring
         return output
-
+    
     def _millify(self, num):
         """Turns a number like 1,000,000 into 1M."""
-
+    
         for unit in ['','k','M','B','T']:
             if num < 1000.0:
                 return "%3.3f%s" % (num, unit)
             num /= 1000.0
-
-	######################
-	# DATABASE FUNCTIONS #
-	######################
-
+    
+    ######################
+    # DATABASE FUNCTIONS #
+    ######################
+    
     def _allteams(self):
         """Return a list of all valid teams (abbr)."""
-
+    
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "SELECT team FROM mlb"
             cursor.execute(query)
             teamlist = [item[0] for item in cursor.fetchall()]
-
+    
         return " | ".join(sorted(teamlist))
-
+    
     def _validteams(self, optteam):
         """Takes optteam as input function and sees if it is a valid team.
         Aliases are supported via mlbteamaliases table.
         Returns a 1 upon error (no team name nor alias found.)
         Returns the team's 3-letter (ex: NYY or ARI) if successful."""
-
+    
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "SELECT team FROM mlbteamaliases WHERE teamalias=?"  # check aliases first.
@@ -189,10 +189,10 @@ class MLB(callbacks.Plugin):
                 returnval = str(aliasrow[0])
         # return time.
         return returnval
-
+    
     def _translateTeam(self, db, column, optteam):
         """Translates optteam (validated via _validteams) into proper string using database column."""
-
+    
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             # query = "SELECT %s FROM mlb WHERE %s='%s'" % (db, column, optteam)
@@ -200,38 +200,38 @@ class MLB(callbacks.Plugin):
             # cursor.execute(query)
             cursor.execute(query, (optteam,))
             row = cursor.fetchone()
-
+    
         return (str(row[0]))
-
+    
     ####################
     # PUBLIC FUNCTIONS #
     ####################
-
+    
     def mlbcountdown(self, irc, msg, args):
         """
         Display countdown until next MLB opening day.
         """
-
-	y = 2014
+    
+        y = 2014
         oDay = (datetime.datetime(y, 03, 30) - datetime.datetime.now()).days
         irc.reply("{0} day(s) until {1} MLB Opening Day.".format(oDay, y))
-
+    
     mlbcountdown = wrap(mlbcountdown)
-
+    
     def mlbteams(self, irc, msg, args):
         """
         Display a list of valid teams for input.
         """
-
+    
         irc.reply("Valid MLB teams are: {0}".format(self._allteams()))
-
+    
     mlbteams = wrap(mlbteams)
-
+    
     def mlbchanlineup(self, irc, msg, args):
         """
         Display a random lineup for channel users.
         """
-
+    
         if not ircutils.isChannel(msg.args[0]):  # make sure its run in a channel.
             irc.reply("ERROR: Must be run from a channel.")
             return
@@ -250,14 +250,14 @@ class MLB(callbacks.Plugin):
             lineup.append("{0}{1}".format(self._bold(a), position))
         # now output.
         irc.reply("{0} ALL-STAR LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
-
+    
     mlbchanlineup = wrap(mlbchanlineup)
-
+    
     def mlbhittingstreaks(self, irc, msg, args):
         """
         Display this year's longest hitstreaks in AL and NL.
         """
-
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9oaXR0aW5nc3RyZWFrcw==')
         html = self._httpget(url)
@@ -284,15 +284,15 @@ class MLB(callbacks.Plugin):
         irc.reply("{0}".format(self._blue(title)))
         for i, x in mlbstreaks.items():
             irc.reply("{0} :: {1}".format(self._bold(i), " | ".join(x)))
-
+    
     mlbhittingstreaks = wrap(mlbhittingstreaks)
-
+    
     def mlbplayoffchances(self, irc, msg, args, optteam):
         """<team>
         Display team's current playoff chances, ws chances, % to obtain seeds, RPI and SOS.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -328,90 +328,16 @@ class MLB(callbacks.Plugin):
             return
         else:  # if we find it.
             irc.reply("{0} chances :: {1}".format(self._red(optteam), output))
-
+    
     mlbplayoffchances = wrap(mlbplayoffchances, [('somethingWithoutSpaces')])
     
-    def mlbbox(self, irc, msg, args, optteam):
-	"""<team>
-	
-	Displays current box store, if any, for game the team is in or played.
-	Ex: NYY
-	"""
-
-        # test for valid teams.
-        optteam = self._validteams(optteam)
-        if not optteam:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # build url and fetch scoreboard.
-        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # process scoreboard.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        games = soup.findAll('div', attrs={'id': re.compile('.*?-gamebox')})
-        # container to put all of the teams in.
-        teamdict = {}
-        # process each "game" (two teams in each)
-        for game in games:
-            teams = game.findAll('p', attrs={'class':'team-name'})
-            for team in teams:  # each game has two teams.
-		tt = team.find('a')
-		if tt:
-		    ahref = team.find('a')['href']
-		    teamname = ahref.split('/')[7].lower()  # will be lowercase.
-		    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
-		    # now lets grab the rest. first, the status.
-		    gmstatus = game.find('div', attrs={'class':'game-status'})
-		    tempd = {}  # lets also make a temp dict.
-		    tempd["status"] = gmstatus.getText()   # add in the text.
-		    two = ['away', 'home']  # iterate through these two.
-		    for one in two:  # iterate over these two.
-			finddiv = game.find('div', attrs={'class':'team ' + one})  # use slice.
-			findteam = finddiv.find('p', attrs={'class':'team-name'})  # name of team.
-			findrec = finddiv.find('p', attrs={'class':'record'})  # name of team.
-			# box score part.
-			findscore = finddiv.find('ul', attrs={'class':'score'})
-			findruns = findscore.find('li', attrs={'id':re.compile('.*?T$')})
-			findhits = findscore.find('li', attrs={'id':re.compile('.*?H$')})
-			finderrors = findscore.find('li', attrs={'id':re.compile('.*?E$')})
-			# now lets inject some of this into our temp dict, which winds up in the main.
-			tempd[one + "team"] = findteam.getText()
-			tempd[one + "record"] = findrec.getText()
-			tempd[one + "runs"] = findruns.getText()
-			# conditionals here if the game has not started.
-			if findhits:
-			    tempd[one + "hits"] = findhits.getText()
-			else:
-			    tempd[one + "hits"] = 0
-			if finderrors:
-			    tempd[one + "errors"] = finderrors.getText()
-			else:
-			    tempd[one + "errors"] = 0
-		    # now append the "status" or "score" to the defaultdict.
-		    teamdict[str(teamname)] = tempd
-        # grab the gameid. fetch.
-        bs = teamdict.get(optteam)
-        # sanity check before we grab the game.
-        if not bs:
-            irc.reply("ERROR: No upcoming/active games with: {0}. Perhaps they're not playing today?".format(optteam))
-            return
-	# if we're here, its time to output. 3 lines.
-	irc.reply("{0:22} {1:<2} {2:<2} {3:<2}".format(self._bold(bs['status']), "R", "H", "E"))
-	irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['awayteam'], bs['awayruns'], bs['awayhits'], bs['awayerrors']))
-	irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['hometeam'], bs['homeruns'], bs['homehits'], bs['homeerrors']))
-    
-    mlbbox = wrap(mlbbox, [('somethingWithoutSpaces')])
-
-    def mlbpitcher(self, irc, msg, args, optteam):
+    def mlbgameumps(self, irc, msg, args, optteam):
         """<team>
-        Displays current pitcher(s) and stats in active or previous game for team.
+        
+        Display current umpires in game involving team.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -433,18 +359,83 @@ class MLB(callbacks.Plugin):
         for game in games:
             teams = game.findAll('p', attrs={'class':'team-name'})
             for team in teams:  # each game has two teams.
-		tt = team.find('a')
-		if tt:
-		    # self.log.info("team: {0}".format(team))
-		    ahref = team.find('a')['href']
-		    teamname = ahref.split('/')[7].lower()  # will be lowercase.
-		    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
-		    teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
-		    teamdict.setdefault(str(teamname), []).append(teamid)
+                tt = team.find('a')
+                if tt:
+                    # self.log.info("team: {0}".format(team))
+                    ahref = team.find('a')['href']
+                    teamname = ahref.split('/')[7].lower()  # will be lowercase.
+                    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+                    teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
+                    teamdict.setdefault(str(teamname), []).append(teamid)
         # grab the gameid. fetch.
         teamgameids = teamdict.get(optteam)
         # sanity check before we grab the game.
-	# self.log.info("TEAMGAMEIDS: {0}".format(teamgameids))
+        if not teamgameids:
+            # self.log.info("ERROR: I got {0} as a team. I only have: {1}".format(optteam, str(teamdict)))
+            irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
+            return
+        # now that we have a valid team/game, lets try to find who the umps are.
+        for teamgameid in teamgameids:  # we had to do foreach due to doubleheaders.
+            url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvYm94c2NvcmU=') + '?gameId=%s' % (teamgameid)
+            html = self._httpget(url)
+            if not html:
+                irc.reply("ERROR: Failed to fetch {0}.".format(url))
+                self.log.error("ERROR opening {0}".format(url))
+                return
+            # now process the boxscore.
+            soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+            umps = soup.find('strong', text="Umpires")
+            if not umps:  # make sure we can find it.
+                irc.reply("ERROR: I could not find any umpires on: {0}".format(url))
+                return
+            # ok we did find umpires. lets grab the nexttd.
+            umptd = umps.findNext('td').getText().encode('utf-8')
+            # lets also grab the game info. crude but it works.
+            gameinfo = soup.find('div', attrs={'id':re.compile('matchup-mlb-.*')}).getText(separator=' ').encode('utf-8')
+            # now output.
+            irc.reply("{0} :: {1}".format(gameinfo, umptd))
+            
+    mlbgameumps = wrap(mlbgameumps, [('somethingWithoutSpaces')])
+        
+    def mlbpitcher(self, irc, msg, args, optteam):
+        """<team>
+        Displays current pitcher(s) and stats in active or previous game for team.
+        Ex: NYY
+        """
+    
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if not optteam:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # build url and fetch scoreboard.
+        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process scoreboard.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        games = soup.findAll('div', attrs={'id': re.compile('.*?-gamebox')})
+        # container to put all of the teams in.
+        teamdict = collections.defaultdict()
+        # process each "game" (two teams in each)
+        for game in games:
+            teams = game.findAll('p', attrs={'class':'team-name'})
+            for team in teams:  # each game has two teams.
+                tt = team.find('a')
+                if tt:
+                    # self.log.info("team: {0}".format(team))
+                    ahref = team.find('a')['href']
+                    teamname = ahref.split('/')[7].lower()  # will be lowercase.
+                    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+                    teamid = team['id'].replace('-aNameOffset', '').replace('-hNameOffset', '')  # just need the gameID.
+                    teamdict.setdefault(str(teamname), []).append(teamid)
+        # grab the gameid. fetch.
+        teamgameids = teamdict.get(optteam)
+        # sanity check before we grab the game.
+        # self.log.info("TEAMGAMEIDS: {0}".format(teamgameids))
         if not teamgameids:
             # self.log.info("ERROR: I got {0} as a team. I only have: {1}".format(optteam, str(teamdict)))
             irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
@@ -464,10 +455,6 @@ class MLB(callbacks.Plugin):
             pitcherpres = soup.findAll('th', text='Pitchers')
             # defaultdict to put key: team value: pitchers.
             teampitchers = collections.defaultdict()
-	    # maybe later? broken for now. before we handle the pitchers, get the "game status"
-	    #gamestatus = soup.find('div', attrs={'id':'gameStatusBarWrap'})  # div should have game status + series.
-	    #gs = gamestatus.getText(separator=' ').encode('utf-8')  # grab the text.
-	    #teampitchers.setdefault(str(optteam), []).append(gs)  # append it.
             # now, find the pitchers. should be two, one per team+ (relievers).
             if len(pitcherpres) != 2:  # game is too far from starting.
                 if "Box Score not available." in html:  # sometimes the boxscore is not up.
@@ -513,22 +500,96 @@ class MLB(callbacks.Plugin):
                                                                                  pitcherso, pitcherhr, pitcherpcst, \
                                                                                  pitcherera)
                         teampitchers.setdefault(str(team), []).append(pstring)  # append into dict.
-	    # now, lets attempt to output.
+        # now, lets attempt to output.
             output = teampitchers.get(optteam, None)
             if not output:  # something went horribly wrong if we're here.
                 irc.reply("ERROR: No pitchers found for {0}. Check when the game is active or finished, not before.".format(optteam))
                 return
             else:  # ok, things did work.
                 irc.reply("{0} :: {1}".format(self._red(optteam), " | ".join(output)))
-
+    
     mlbpitcher = wrap(mlbpitcher, [('somethingWithoutSpaces')])
 
+    def mlbbox(self, irc, msg, args, optteam):
+        """<team>
+        Displays current box store, if any, for game the team is in or played.
+        Ex: NYY
+        """
+    
+        # test for valid teams.
+        optteam = self._validteams(optteam)
+        if not optteam:  # team is not found in aliases or validteams.
+            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
+            return
+        # build url and fetch scoreboard.
+        url = self._b64decode('aHR0cDovL3Njb3Jlcy5lc3BuLmdvLmNvbS9tbGIvc2NvcmVib2FyZA==')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process scoreboard.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        games = soup.findAll('div', attrs={'id': re.compile('.*?-gamebox')})
+        # container to put all of the teams in.
+        teamdict = {}
+        # process each "game" (two teams in each)
+        for game in games:
+            teams = game.findAll('p', attrs={'class':'team-name'})
+            for team in teams:  # each game has two teams.
+                tt = team.find('a')
+                if tt:
+                    ahref = team.find('a')['href']
+                    teamname = ahref.split('/')[7].lower()  # will be lowercase.
+                    teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
+                    # now lets grab the rest. first, the status.
+                    gmstatus = game.find('div', attrs={'class':'game-status'})
+                    tempd = {}  # lets also make a temp dict.
+                    tempd["status"] = gmstatus.getText()   # add in the text.
+                    two = ['away', 'home']  # iterate through these two.
+                    for one in two:  # iterate over these two.
+                        finddiv = game.find('div', attrs={'class':'team ' + one})  # use slice.
+                        findteam = finddiv.find('p', attrs={'class':'team-name'})  # name of team.
+                        findrec = finddiv.find('p', attrs={'class':'record'})  # name of team.
+                        # box score part.
+                        findscore = finddiv.find('ul', attrs={'class':'score'})
+                        findruns = findscore.find('li', attrs={'id':re.compile('.*?T$')})
+                        findhits = findscore.find('li', attrs={'id':re.compile('.*?H$')})
+                        finderrors = findscore.find('li', attrs={'id':re.compile('.*?E$')})
+                        # now lets inject some of this into our temp dict, which winds up in the main.
+                        tempd[one + "team"] = findteam.getText()
+                        tempd[one + "record"] = findrec.getText()
+                        tempd[one + "runs"] = findruns.getText()
+                        # conditionals here if the game has not started.
+                        if findhits:
+                            tempd[one + "hits"] = findhits.getText()
+                        else:
+                            tempd[one + "hits"] = 0
+                        if finderrors:
+                            tempd[one + "errors"] = finderrors.getText()
+                        else:
+                            tempd[one + "errors"] = 0
+                    # now append the "status" or "score" to the defaultdict.
+                    teamdict[str(teamname)] = tempd
+        # grab the gameid. fetch.
+        bs = teamdict.get(optteam)
+        # sanity check before we grab the game.
+        if not bs:
+            irc.reply("ERROR: No upcoming/active games with: {0}. Perhaps they're not playing today?".format(optteam))
+            return
+        # if we're here, its time to output. 3 lines.
+        irc.reply("{0:22} {1:<2} {2:<2} {3:<2}".format(self._bold(bs['status']), "R", "H", "E"))
+        irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['awayteam'], bs['awayruns'], bs['awayhits'], bs['awayerrors']))
+        irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['hometeam'], bs['homeruns'], bs['homehits'], bs['homeerrors']))
+    
+    mlbbox = wrap(mlbbox, [('somethingWithoutSpaces')])
+ 
     def mlbworldseries(self, irc, msg, args, optyear):
         """<YYYY>
         Display results for a MLB World Series that year. Earliest year is 1903 and latest is the last postseason.
         Ex: 2000.
         """
-
+    
         # test for valid date.
         testdate = self._validate(optyear, '%Y')
         if not testdate:
@@ -562,14 +623,14 @@ class MLB(callbacks.Plugin):
             return
         else:  # we have the world series.
             irc.reply("{0} World Series :: {1}".format(self._red(optyear), outyear))
-
+    
     mlbworldseries = wrap(mlbworldseries, [('int')])
-
+    
     def mlballstargame(self, irc, msg, args, optyear):
         """<YYYY>
         Display results for that year's MLB All-Star Game. Ex: 1996. Earliest year is 1933 and latest is this season.
         """
-
+    
         # first test year.
         testdate = self._validate(optyear, '%Y')
         if not testdate:
@@ -598,14 +659,14 @@ class MLB(callbacks.Plugin):
             return
         else:  # we do have a year/game.
             irc.reply("{0} All-Star Game :: {1}".format(self._red(optyear), outyear))
-
+    
     mlballstargame = wrap(mlballstargame, [('int')])
-
+    
     def mlbcyyoung(self, irc, msg, args):
         """
         Display Cy Young prediction list. Uses a method, based on past results, to predict Cy Young balloting.
         """
-
+    
         # build and fetch URL.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9mZWF0dXJlcy9jeXlvdW5n')
         html = self._httpget(url)
@@ -627,15 +688,15 @@ class MLB(callbacks.Plugin):
         # output time.
         for i, x in cyyoung.iteritems():
             irc.reply("{0} :: {1}".format(self._red(i), " | ".join([item for item in x])))
-
+    
     mlbcyyoung = wrap(mlbcyyoung)
-
+    
     def mlbseries(self, irc, msg, args, optteam, optopp):
         """<team> <opp>
         Display the remaining games between TEAM and OPP in the current schedule.
         Ex: NYY TOR
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -685,14 +746,14 @@ class MLB(callbacks.Plugin):
         else:  # no remaining games found.
             irc.reply("I do not see any remaining games between: {0} and {1} in the {2} schedule.".format(\
                 self._bold(optteam), self._bold(optopp), datetime.date.today().year))
-
+    
     mlbseries = wrap(mlbseries, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
+    
     def mlbejections(self, irc, msg, args):
         """
         Display the total number of ejections and five most recent for the MLB season.
         """
-
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL3BvcnRhbC5jbG9zZWNhbGxzcG9ydHMuY29tL2hpc3RvcmljYWwtZGF0YS8=') + str(datetime.datetime.now().year) + '-mlb-ejections-replay-reviews'
         html = self._httpget(url)
@@ -738,14 +799,14 @@ class MLB(callbacks.Plugin):
         pe = "Players/Managers ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)]))
         irc.reply("{0} || {1}".format(uc, pe))
         irc.reply(" | ".join([item for item in append_list]))
-
+    
     mlbejections = wrap(mlbejections)
-
+    
     def mlbarrests(self, irc, msg, args):
         """
         Display the last 5 MLB arrests.
         """
-
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2FycmVzdG5hdGlvbi5jb20vY2F0ZWdvcnkvcHJvLWJhc2ViYWxsLw==')
         html = self._httpget(url)
@@ -781,15 +842,15 @@ class MLB(callbacks.Plugin):
         irc.reply("{0} days since last MLB arrest".format(self._red(daysSince)))
         for each in arrestlist[0:6]:  # only show 6.
             irc.reply(each)
-
+    
     mlbarrests = wrap(mlbarrests)
-
+    
     def mlbgamesbypos (self, irc, msg, args, optteam):
         """<team>
         Display a team's games by position.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -818,16 +879,16 @@ class MLB(callbacks.Plugin):
         output = "{0} (games by POS) :: {1}".format(self._red(optteam.upper()), descstring)
         # output.
         irc.reply(output)
-
+    
     mlbgamesbypos = wrap(mlbgamesbypos, [('somethingWithoutSpaces')])
-
+    
     def mlbroster(self, irc, msg, args, optlist, optteam):
         """[--40man|--active] <team>
         Display active roster for team.
         Defaults to active roster but use --40man switch to show the entire roster.
         Ex: --40man NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -867,16 +928,16 @@ class MLB(callbacks.Plugin):
         # output time.
         for i, j in team_data.iteritems():  # output one line per position.
             irc.reply("{0} {1} :: {2}".format(self._red(optteam.upper()), self._bold(i), " | ".join([item for item in j])))
-
+    
     mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
-
+    
     def mlbrosterstats(self, irc, msg, args, optteam):
         """[team]
         Displays top 5 youngest/oldest teams.
         Optionally, use TEAM as argument to display roster stats/averages for MLB team.
         Ex: NYY
         """
-
+    
         if optteam:  # if we want a specific team, validate it.
             optteam = self._validteams(optteam)
             if not optteam:  # team is not found in aliases or validteams.
@@ -929,12 +990,12 @@ class MLB(callbacks.Plugin):
              # above, first five are the youngest. oldest = last five.
             output = "{0} :: {1}".format(self._bold("5 Oldest MLB Teams:"), " | ".join([item['team'] for item in object_list[-6:-1]]))
             irc.reply(output)
-
+    
     mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
-
+    
     def _format_cap(self, figure):
         """Format cap numbers for mlbpayroll command."""
-
+    
         figure = figure.replace(',', '').strip()  # remove commas.
         if figure.startswith('-'):  # figure out if we're a negative number.
             negative = True
@@ -951,13 +1012,13 @@ class MLB(callbacks.Plugin):
             figure = "-" + figure
         # now return
         return figure
-
+    
     def mlbpayroll(self, irc, msg, args, optteam):
         """<team>
         Display payroll situation for <team>.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -976,29 +1037,29 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         teamtitle = soup.find('title')
         table = soup.find('table', attrs={'id':'teamTable'})
-	# we just use rows here. last 4 only.
-	rows = table.findAll('tr')[-4:]
+        # we just use rows here. last 4 only.
+        rows = table.findAll('tr')[-4:]
         # list for output.
         payroll = []
         # iterate over rows.
-	for row in rows[0:3]:  # first 3.
-	    tds = row.findAll('td')
-	    t = tds[0].getText()
-	    figure = self._format_cap(tds[4].getText())
-	    payroll.append("{0}: {1}".format(self._ul(t), figure))
-	# last one. just grab the "total" figure.
-	totalcap = self._format_cap(rows[3].find('span', attrs={'class':'cap total'}).getText())  # specific one.
-	# output
+        for row in rows[0:3]:  # first 3.
+            tds = row.findAll('td')
+            t = tds[0].getText()
+            figure = self._format_cap(tds[4].getText())
+            payroll.append("{0}: {1}".format(self._ul(t), figure))
+        # last one. just grab the "total" figure.
+        totalcap = self._format_cap(rows[3].find('span', attrs={'class':'cap total'}).getText())  # specific one.
+        # output
         irc.reply("{0} :: Total Cap: {1} :: {2}".format(self._bold(teamtitle.getText()), totalcap, " | ".join([item for item in payroll])))
-
+    
     mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
-
+    
     def mlbweather(self, irc, msg, args, optteam):
         """<team>
         Display weather for MLB team at park they are playing at.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1034,7 +1095,7 @@ class MLB(callbacks.Plugin):
                 weather = "[ROOF] " + weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
             else:
                 weather = weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
-
+    
             # now do some split work to get the dict with teams as keys.
             teams = matchup.getText().split(',', 1)  # NYY at DET, 1:05PM ET
             # now, left with TEAM at TEAM. foreach on both to append to dict.
@@ -1048,14 +1109,14 @@ class MLB(callbacks.Plugin):
             irc.reply(output)
         else:  # team not found.
             irc.reply("ERROR: No weather found for: {0}. Perhaps the team is not playing?".format(optteam))
-
+    
     mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
-
+    
     def mlbvaluations(self, irc, msg, args):
         """
         Display current MLB team valuations from Forbes.
         """
-
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL3d3dy5mb3JiZXMuY29tL21sYi12YWx1YXRpb25zL2xpc3Qv')
         html = self._httpget(url)
@@ -1079,16 +1140,16 @@ class MLB(callbacks.Plugin):
         # output.
         irc.reply("{0} (in millions) :: {1}".format(self._red("Current MLB Team Values"), self._bold(updated)))
         irc.reply("{0}".format(" | ".join([item for item in object_list])))
-
+    
     mlbvaluations = wrap(mlbvaluations)
-
+    
     def mlbremaining(self, irc, msg, args, optteam):
         """<team>
         Display remaining games/schedule for a playoff contender.
         NOTE: Will only work closer toward the end of the season.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1119,37 +1180,37 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} not listed. Not considered a playoff contender.".format(optteam))
         else:  # team is found.
             irc.reply("{0} :: {1}".format(self.bold(optteam), (" ".join(output))))
-
+    
     mlbremaining = wrap(mlbremaining, [('somethingWithoutSpaces')])
-
+    
     def mlbleaders(self, irc, msg, args, optlist, optleague, optstat):
         """<mlb|nl|al> <statname>
-	
+    
         Display MLB/AL/NL leaders in various stat categories.
-	Valid categories: AVG, HR, RBI, R, OBP, SLUGGING, OPS, SB, W, ERA, SO, S, WHIP
-	
-	Ex: mlb ops
+        Valid categories: AVG, HR, RBI, R, OBP, SLUGGING, OPS, SB, W, ERA, SO, S, WHIP
+        
+        Ex: mlb ops
         """
-
+    
         # first, we declare our very long list of categories. used for validity/matching/url and the help.
         stats = {
-	    'AVG':'avg',
-	    'HR':'homeRuns',
-	    'RBI':'RBIs',
-	    'R':'runs',
-	    'OBP':'onBasePct',
-	    'SLUGGING':'slugAvg',
-	    'OPS':'OPS',
-	    'SB':'stolenBases',
-	    'W':'wins',
-	    'ERA':'ERA',
-	    'SO':'strikeouts',
-	    'S':'saves',
-	    'WHIP':'WHIP'
+        'AVG':'avg',
+        'HR':'homeRuns',
+        'RBI':'RBIs',
+        'R':'runs',
+        'OBP':'onBasePct',
+        'SLUGGING':'slugAvg',
+        'OPS':'OPS',
+        'SB':'stolenBases',
+        'W':'wins',
+        'ERA':'ERA',
+        'SO':'strikeouts',
+        'S':'saves',
+        'WHIP':'WHIP'
         }
         # handle league. check for valid.
         optleague = optleague.upper()  # upper to match.
-	# validate the leagues.
+        # validate the leagues.
         validleagues = {'MLB':'9', 'NL':'8', 'AL':'7'}
         if optleague not in validleagues:  # invalid league found.
             irc.reply("ERROR: '{0}' is an invalid league. Must specify {1}".format(optleague, " | ".join(validleagues.keys())))
@@ -1160,9 +1221,8 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: '{0}' is an invalid category. Must be one of: {1}".format(optstat, " | ".join(stats.keys())))
             return
         # now we build URL.
-	# # http://m.espn.go.com/mlb/leagueleaders?category=avg&groupId=9&season=2014&fa6hno2nn2px0=GO&y=1&wjb=
         url = b64decode('aHR0cDovL20uZXNwbi5nby5jb20vbWxiL2xlYWd1ZWxlYWRlcnM=')
-	url += '?' + 'category=%s&groupId=%s&fa6hno2nn2px0=GO&y=1&wjb=' % (stats[optstat], validleagues[optleague])
+        url += '?' + 'category=%s&groupId=%s&fa6hno2nn2px0=GO&y=1&wjb=' % (stats[optstat], validleagues[optleague])
         # now, with the url, fetch and return content.
         html = self._httpget(url)
         if not html:
@@ -1175,31 +1235,31 @@ class MLB(callbacks.Plugin):
             return
         # process HTML.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	table = soup.find('table', attrs={'class':'table', 'width':'100%', 'cellspacing':'0'})  # table class="table" width="100%" cellspacing="0"
-	trs = table.findAll('tr')[1:]  # skip the header row.
-	# lets do a sanity check.
-	if len(trs) == 0:
-	    irc.reply("ERROR: No stats found. Too early in the year?")
-	    return
-	# we're good. container for the output.
+        table = soup.find('table', attrs={'class':'table', 'width':'100%', 'cellspacing':'0'})  # table class="table" width="100%" cellspacing="0"
+        trs = table.findAll('tr')[1:]  # skip the header row.
+        # lets do a sanity check.
+        if len(trs) == 0:
+            irc.reply("ERROR: No stats found. Too early in the year?")
+            return
+        # we're good. container for the output.
         mlbstats = []
-	# process the rows
-	for tr in trs:
-	    tds = tr.findAll('td')
-	    rk = tds[0].getText()
-	    plr = tds[1].getText().encode('utf-8')
-	    st = tds[2].getText()
-	    mlbstats.append("{0}. {1} ({2})".format(rk, plr, st))
-	# now we prepare the output.
+        # process the rows
+        for tr in trs:
+            tds = tr.findAll('td')
+            rk = tds[0].getText()
+            plr = tds[1].getText().encode('utf-8')
+            st = tds[2].getText()
+            mlbstats.append("{0}. {1} ({2})".format(rk, plr, st))
+        # now we prepare the output.
         irc.reply("MLB LEADERS IN {0}({1}) :: {2}".format(self._ul(optstat), self._bold(optleague), " | ".join(mlbstats)))
-
+    
     mlbleaders = wrap(mlbleaders, [getopts({'postseason':'', 'bottom':''}), ('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
+    
     def mlbplayoffs(self, irc, msg, args, optleague):
         """<AL|NL>
         Display playoff matchups if season ended today.
         """
-
+    
         # validate league for url.
         optleague = optleague.upper()
         if optleague == "AL":
@@ -1229,16 +1289,16 @@ class MLB(callbacks.Plugin):
         # now prepare to output. have to order the matchups string.
         matchups = "(WC: {1} vs. {2}) vs. {0} || {3} vs. {4}".format(teams[0], teams[3], teams[4], teams[1], teams[2])
         irc.reply("{0} :: {1}".format(self._red(title), matchups))
-
+    
     mlbplayoffs = wrap(mlbplayoffs, [('somethingWithoutSpaces')])
-
+    
     def mlbcareerleaders(self, irc, msg, args, optplayertype, optcategory):
         """<batting|pitching> <category>
         Display career stat leaders in batting|pitching <category>
         Must specify batting or pitching, along with stat from either category.
         Ex: batting batavg OR pitching wins
         """
-
+    
         battingcategories = { 'batavg':'batting_avg', 'onbasepct':'onbase_perc', 'sluggingpct':'slugging_perc' ,
                             'onbaseplusslugging':'onbase_plus_slugging', 'gamesplayedAB':'G', 'atbats':'AB', 'plateappear':'PA',
                             'runsscored':'R', 'hitsAB':'H', 'totalbases':'TB', 'doubles':'2B', 'triples':'3B', 'homeruns':'HR',
@@ -1256,7 +1316,7 @@ class MLB(callbacks.Plugin):
                             'losses':'L', 'earnedruns':'ER', 'wildpitches':'WP', 'hitbypitch':'HBP_p', 'battersfaced':'batters_faced',
                             'gamesfinished':'GF', 'adjustedERAplus':'earned_run_avg_plus', 'adjpitchingruns':'apRuns', 'adjpitchingwins':'apWins'
                             }
-
+    
         # have to match a k/v in each dict with batting or pitching.
         optplayertype = optplayertype.lower()  # first lower optplayertype
         if optplayertype == "batting":  # check if issued batting w/o a category.
@@ -1313,15 +1373,15 @@ class MLB(callbacks.Plugin):
             self._bold(optcategory), self._ul("UNDERLINE"))
         irc.reply(output)  # header.
         irc.reply(" | ".join([item for item in object_list]))  # now our top10.
-
+    
     mlbcareerleaders = wrap(mlbcareerleaders, [('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
-
+    
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
         Display various MLB award winners for current (or previous) year. Use YYYY for year.
         Ex: 2011
         """
-
+    
         # test if we have date or not.
         if optyear:   # crude way to find the latest awards.
             testdate = self._validate(optyear, '%Y')
@@ -1366,15 +1426,15 @@ class MLB(callbacks.Plugin):
             self._bold(alroy), self._bold(nlroy), self._bold(almgr), self._bold(nlmgr))
         # actually output.
         irc.reply(output)
-
+    
     mlbawards = wrap(mlbawards, [optional('int')])
-
+    
     def mlbschedule(self, irc, msg, args, optteam):
         """<team>
         Display the next five upcoming games for team.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1383,8 +1443,7 @@ class MLB(callbacks.Plugin):
         # translate team for url.
         lookupteam = self._translateTeam('eshort', 'team', optteam) # (db, column, optteam)
         # build and fetch url.
-	#
-	url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3NjaGVkdWxlL18vbmFtZQ==') + '/%s/' % lookupteam
+        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3NjaGVkdWxlL18vbmFtZQ==') + '/%s/' % lookupteam
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -1392,45 +1451,45 @@ class MLB(callbacks.Plugin):
             return
         # now soup the actual html. BS cleans up the RSS because the HTML is junk.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	div = soup.find('div', attrs={'id':'my-teams-table'})
-	table = div.find('table', attrs={'class':'tablehead'})
-	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow.*|^oddrow.*')})
-	# 
-	container = []
-	#
-	for (i, tr) in enumerate(trs):
-	    tds = tr.findAll('td')
-	    if len(tds) == 7 or len(tds) == 8:
-		sta = tds[3].getText()
-		if sta == "" or sta == "MLB Network":
-		    container.append(i)
-	#
-	if len(container) > 0:
-	    schednum = container[0]
-	else:
-	    self.log.info("ERROR: mlbschedule. I only got {0} in container (no [2])".format(container))
-	    irc.reply("ERROR: Something went wrong looking up the schedule. Try again later.")
-	    return
-	#
-	schedule = []
-	#
-	for tr in trs[schednum:schednum+5]:
-	    tds = tr.findAll('td')
-	    dte = tds[0].getText().encode('utf-8')
-	    opp = tds[1].getText().encode('utf-8').replace('vs', 'vs ')
-	    sta = tds[2].getText().encode('utf-8')
-	    schedule.append("{0} {1} {2}".format(dte, opp, sta))
+        div = soup.find('div', attrs={'id':'my-teams-table'})
+        table = div.find('table', attrs={'class':'tablehead'})
+        trs = table.findAll('tr', attrs={'class':re.compile('^evenrow.*|^oddrow.*')})
+        # 
+        container = []
+        #
+        for (i, tr) in enumerate(trs):
+            tds = tr.findAll('td')
+            if len(tds) == 7 or len(tds) == 8:
+                sta = tds[3].getText()
+                if sta == "" or sta == "MLB Network":
+                    container.append(i)
+        #
+        if len(container) > 0:
+            schednum = container[0]
+        else:
+            self.log.info("ERROR: mlbschedule. I only got {0} in container (no [2])".format(container))
+            irc.reply("ERROR: Something went wrong looking up the schedule. Try again later.")
+            return
+        #
+        schedule = []
+        #
+        for tr in trs[schednum:schednum+5]:
+            tds = tr.findAll('td')
+            dte = tds[0].getText().encode('utf-8')
+            opp = tds[1].getText().encode('utf-8').replace('vs', 'vs ')
+            sta = tds[2].getText().encode('utf-8')
+            schedule.append("{0} {1} {2}".format(dte, opp, sta))
         # prepare output string and output.
         descstring = " | ".join([item for item in schedule])
         irc.reply("{0} :: {1}".format(self._bold(optteam), descstring))
-
+    
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
-
+    
     def mlbdailyleaders(self, irc, msg, args):
-	"""
-	Display MLB daily leaders.
-	"""
-
+        """
+        Display MLB daily leaders.
+        """
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9kYWlseWxlYWRlcnM=')
         html = self._httpget(url)
@@ -1438,36 +1497,36 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-        # process html.	
-	soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	mlbdate = soup.find('h1', attrs={'class':'h2'})
-	div = soup.find('div', attrs={'id':'my-players-table'})
-	if not div:
-	    irc.reply("ERROR: Broken HTML. Check page formatting.")
-	    return
-	table = div.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'})
-	if not table:
-	    irc.reply("ERROR: Broken HTML. Check page formatting.")
-	    return
-	rows = table.findAll('tr', attrs={'class':re.compile('evenrow.*|oddrow.*')})
-	# container
-	mlbdailyleaders = []
-	# iterate over each row.
-	for (i, row) in enumerate(rows[0:10]):
-	    tds = row.findAll('td')
-	    plr = tds[1].getText().encode('utf-8')
-	    mlbdailyleaders.append("{0}. {1}".format(i+1, plr))
-	# now output.
-	irc.reply("{0} :: {1}".format(self._bold(mlbdate.getText()), " ".join([i for i in mlbdailyleaders])))
+        # process html. 
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        mlbdate = soup.find('h1', attrs={'class':'h2'})
+        div = soup.find('div', attrs={'id':'my-players-table'})
+        if not div:
+            irc.reply("ERROR: Broken HTML. Check page formatting.")
+            return
+        table = div.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'})
+        if not table:
+            irc.reply("ERROR: Broken HTML. Check page formatting.")
+            return
+        rows = table.findAll('tr', attrs={'class':re.compile('evenrow.*|oddrow.*')})
+        # container
+        mlbdailyleaders = []
+        # iterate over each row.
+        for (i, row) in enumerate(rows[0:10]):
+            tds = row.findAll('td')
+            plr = tds[1].getText().encode('utf-8')
+            mlbdailyleaders.append("{0}. {1}".format(i+1, plr))
+        # now output.
+        irc.reply("{0} :: {1}".format(self._bold(mlbdate.getText()), " ".join([i for i in mlbdailyleaders])))
     
     mlbdailyleaders = wrap(mlbdailyleaders)
-
+    
     def mlbmanager(self, irc, msg, args, optteam):
         """<team>
         Display the manager for team.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1500,18 +1559,18 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Something went horribly wrong looking up the manager for: {0}".format(optteam))
         else:  # we found so output.
             irc.reply(output)
-
+    
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
-
+    
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW|ALWC|NLWC>
-
+    
         Display divisional standings for a division.
         Can also display wild-card standings via ALWC or NLWC.
         Use --full or --expanded or --vsdivision to show extended stats.
         Ex: --full ALC or --expanded ALE.
         """
-
+    
         # first, check getopts for what to display.
         full, expanded, vsdivision = False, False, False
         for (option, arg) in optlist:
@@ -1534,7 +1593,7 @@ class MLB(callbacks.Plugin):
         if optdiv not in leaguetable:  # make sure keys are present.
             irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
             return
-
+    
         # build and fetch url. diff urls depending on option.
         if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # special url for WC.
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3dpbGQtY2FyZA0K')
@@ -1553,10 +1612,10 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8') # one of these below will break if formatting changes.
-	stitle = soup.find('title')  # dirty check for spring training.
-	if stitle and 'Spring Training' in stitle.text:  # we found it.
-	    irc.reply("ERROR: I don't do standings during Spring Training. Check back in the regular season.")
-	    return
+        stitle = soup.find('title')  # dirty check for spring training.
+        if stitle and 'Spring Training' in stitle.text:  # we found it.
+            irc.reply("ERROR: I don't do standings during Spring Training. Check back in the regular season.")
+            return
         div = soup.find('div', attrs={'class':'mod-container mod-table mod-no-header'}) # div has all
         table = div.find('table', attrs={'class':'tablehead'}) # table in there
         rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')}) # rows are each team
@@ -1616,15 +1675,15 @@ class MLB(callbacks.Plugin):
                             else:  # rest of the elements outside the team.
                                 tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
                         irc.reply(tableRow)  # output.
-
+    
     mlbstandings = wrap(mlbstandings, [getopts({'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
-
+    
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
         Gets lineup for MLB team.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1643,31 +1702,32 @@ class MLB(callbacks.Plugin):
             return
         # process html. this is kinda icky.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	div = soup.find('div', attrs={'class':'team-lineup highlight'})
-	divs = div.findAll('div')	
-	# 20140330 - had to fix this again.
-	gmdate = divs[1].getText()  # date of game.
+        div = soup.find('div', attrs={'class':'team-lineup highlight'})
+        divs = div.findAll('div')   
+        # 20140330 - had to fix this again.
+        gmdate = divs[1].getText()  # date of game.
         seconddiv = divs[3]   # opp pitcher.
         otherpitcher = seconddiv.getText()  # opp pitcher and team.
-	lineup = div.find('div', attrs={'class':'game-lineup'})
-	# sanity check.
-	if "No lineup yet" in lineup.getText():
-	    irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
-	    return
-	else:  # div is a collection of divs, each div = person in lineup.
-	    lineup = lineup.findAll('div')
-	    lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
-	irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._bold(optteam), gmdate, otherpitcher, lineup))
-
+        lineup = div.find('div', attrs={'class':'game-lineup'})
+        # sanity check.
+        if "No lineup yet" in lineup.getText():
+            irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
+            return
+        else:  # div is a collection of divs, each div = person in lineup.
+            lineup = lineup.findAll('div')
+            lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
+        # output.
+        irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._bold(optteam), gmdate, otherpitcher, lineup))
+    
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
-
+    
     def mlbinjury(self, irc, msg, args, optlist, optteam):
         """[--details] <team>
         Show all injuries for team.
         Use --details to display full table with team injuries.
         Ex: --details BOS or NYY
         """
-
+    
         # handle optlist (getopts)
         details = False
         for (option, arg) in optlist:
@@ -1719,14 +1779,14 @@ class MLB(callbacks.Plugin):
         else:  # no detail.
             irc.reply("{0} :: {1} Injuries".format(self._red(optteam), len(object_list)))
             irc.reply(" | ".join([item['name'] + " (" + item['returns'] + ")" for item in object_list]))
-
+    
     mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
-
+    
     def mlbpowerrankings(self, irc, msg, args):
         """
         Display this week's MLB Power Rankings.
         """
-
+    
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9wb3dlcnJhbmtpbmdz')
         html = self._httpget(url)
@@ -1756,15 +1816,15 @@ class MLB(callbacks.Plugin):
             powerrankings.append("{0}. {1} (prev: {2})".format(rank, team, lastweek))
         # now output.
         irc.reply("{0} :: {1}".format(self._bold(headline.getText()), " | ".join([i for i in powerrankings])))
-
+    
     mlbpowerrankings = wrap(mlbpowerrankings)
-
+    
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """<team> <category>
         Display leaders on a team in stats for a specific category.
         Ex. NYY hr or LAD ops
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1801,16 +1861,16 @@ class MLB(callbacks.Plugin):
         # prepare output and output.
         thelist = " | ".join([item for item in object_list])
         irc.reply("{0} leaders for {1} :: {2}".format(self._red(optteam), self._bold(optcategory.upper()), thelist))
-
+    
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
+    
     def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
         """<MLB|AL|NL> <category>
         Display top 10 teams in category for a specific stat.
         Categories: hr, avg, rbi, ra, sb, era, whip, k
         Ex: MLB hr or AL rbi or NL era
         """
-
+    
         # establish valid leagues and valid categories.
         league = {'mlb': '9', 'al':'7', 'nl':'8'}  # do our own translation here for league/category.
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'ra':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
@@ -1846,15 +1906,15 @@ class MLB(callbacks.Plugin):
         # output
         thelist = " | ".join([item for item in append_list])
         irc.reply("Leaders in {0} for {1} :: {2}".format(self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
-
+    
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-
+    
     def mlbteamtrans(self, irc, msg, args, optteam):
         """<team>
         Shows recent MLB transactions for a team.
         Ex: NYY
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1880,16 +1940,16 @@ class MLB(callbacks.Plugin):
                 if "href=" not in str(item):
                     trans = item.findAll(text=True)
                     irc.reply("{0:8} {1}".format(self._bold(trans[0]), trans[1]))
-
+    
     mlbteamtrans = wrap(mlbteamtrans, [('somethingWithoutSpaces')])
-
+    
     def mlbtrans(self, irc, msg, args, optdate):
         """[YYYYmmDD]
         Display all mlb transactions. Will only display today's.
         Use date in format: 20120912 to display other dates.
         Ex: 20130525.
         """
-
+    
         # do we have a date or not?
         if optdate:  # if we have a date, test it out if it's valid.
             try:
@@ -1913,7 +1973,7 @@ class MLB(callbacks.Plugin):
         # if we do have transactions, process HTML.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         t1 = soup.findAll('div', attrs={'class':re.compile('ind alt|ind')})
-
+    
         if len(t1) < 1:  # nothing found.
             irc.reply("ERROR: I did not find any MLB transactions for: {0}".format(optdate))
             return
@@ -1926,15 +1986,15 @@ class MLB(callbacks.Plugin):
                         team = match1.group(1)  # shorten here?
                         transaction = match1.group(2)
                         irc.reply("{0} - {1}".format(self._bold(team), transaction))
-
+    
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
-
+    
     def mlbprob(self, irc, msg, args, optteam):
         """<TEAM>
         Display the MLB probables for a team over the next 5 stars.
         Ex: NYY.
         """
-
+    
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1981,26 +2041,26 @@ class MLB(callbacks.Plugin):
             if optteam in eachentry['matchup']:  # if optteam is contained in matchup, we output.
                 irc.reply("{0:10} {1:25} {2:4} {3:15} {4:15} {5:4} {6:15} {7:15}".format(eachentry['date'], eachentry['matchup'],\
                     eachentry['vteam'], eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats']))
-
+    
     mlbprob = wrap(mlbprob, [('somethingWithoutSpaces')])
-
+    
     #############################
     # PLAYER FIND / STATS STUFF #
     #############################
-
+    
     def _sanitizeName(self, name):
         """ Sanitize name. """
-
+    
         name = name.lower()  # lower.
         name = name.strip('.')  # remove periods.
         name = name.strip('-')  # remove dashes.
         name = name.strip("'")  # remove apostrophies.
         # possibly strip jr/sr/III suffixes in here?
         return name
-
+    
     def _similarPlayers(self, optname):
         """Return a dict containing the five most similar players based on optname."""
-
+    
         url = self._b64decode('aHR0cHM6Ly9lcmlrYmVyZy5jb20vbWxiL3BsYXllcnM=')
         html = self._httpget(url)
         if not html:
@@ -2009,17 +2069,17 @@ class MLB(callbacks.Plugin):
             return None
         # now that we have the list, lets parse the json.
         try:
-	    soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	    table = soup.find('table')
-	    # do a sanity check.
-	    trs = table.find('tbody').findAll('tr')
-	    activeplayers = []
-	    # iterate over each row.
-	    for tr in trs:
-	        tds = tr.findAll('td')
-	        i = tds[0].getText().replace('.', '')  # id.
-	        n = tds[1].find('a').getText().encode('utf-8')  # name.
-	        activeplayers.append({'id':i, 'full_name':n})
+            soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+            table = soup.find('table')
+            # do a sanity check.
+            trs = table.find('tbody').findAll('tr')
+            activeplayers = []
+            # iterate over each row.
+            for tr in trs:
+                tds = tr.findAll('td')
+                i = tds[0].getText().replace('.', '')  # id.
+                n = tds[1].find('a').getText().encode('utf-8')  # name.
+                activeplayers.append({'id':i, 'full_name':n})
         except Exception, e:
             self.log.info("ERROR: _similarPlayers :: Could not parse source for players :: {0}".format(e))
             return None
@@ -2050,13 +2110,13 @@ class MLB(callbacks.Plugin):
             self.log.info("_similarPlayers :: NO MATCHES for {0} :: {1}".format(optname, matching))
         # return matching now.
         return matching
-
+    
     def _pf(self, db, pname):
         """<e|r|s> <player>
         
         Find a player's page via google ajax. Specify DB based on site.
         """
-
+    
         # first, figure out the site based on db string.
         # quote_plus(search_term)
         # urllib.urlencode({'q':searchfor})
@@ -2089,27 +2149,27 @@ class MLB(callbacks.Plugin):
         # finally, return the first url.
         url = results[0]['url']
         return url
-
-    def _so(self, d):
-	"""<dict> 
-	
-	Input dict of stats. Order them properly.
-	"""
     
-	so = ['GP','AB','AVG','HR','RBI','SB','CS','R','H','2B','3B','OBP','SLG','OPS','BB','SO',
-	      'IP','W','L','SV','ERA','WHIP','BB','SO','H','HR','HLD','BLSV','R','CG','SHO','WAR']
-	# one liner is always better.
-	o = [self._bold(v) + ": " + d[v] for v in so if v in d]
-	# we return the list.
-	return o
-
+    def _so(self, d):
+        """<dict> 
+        
+        Input dict of stats. Order them properly.
+        """
+        
+        so = ['GP','AB','AVG','HR','RBI','SB','CS','R','H','2B','3B','OBP','SLG','OPS','BB','SO',
+              'IP','W','L','SV','ERA','WHIP','BB','SO','H','HR','HLD','BLSV','R','CG','SHO','WAR']
+        # one liner is always better.
+        o = [self._bold(v) + ": " + d[v] for v in so if v in d]
+        # we return the list.
+        return o
+    
     def mlbplayercontract(self, irc, msg, args, optplayer):
         """<player name>
-	
-		Display known contract details for active player.
+    
+        Display known contract details for active player.
         Ex: Derek Jeter.
         """
-
+    
         # try and grab a player.
         url = self._pf('r', optplayer)
         if not url:
@@ -2128,30 +2188,30 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.find('div', attrs={'class':'playername'})
-	if not plrname:
-	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
-	    return
-	else:  # grab their name and stuff.
-	    plrname = plrname.find('h1').getText().encode('utf-8')
-	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
-	# now find the n00z.
-	div = soup.find('div', attrs={'class':'report'})
-	if not div:
-	    irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
-	    return
-	# we do have stuff. output.
-	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
-	
+        plrname = soup.find('div', attrs={'class':'playername'})
+        if not plrname:
+            irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+            return
+        else:  # grab their name and stuff.
+            plrname = plrname.find('h1').getText().encode('utf-8')
+            plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+        # now find the n00z.
+        div = soup.find('div', attrs={'class':'report'})
+        if not div:
+            irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
+            return
+        # we do have stuff. output.
+        irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+    
     mlbplayercontract = wrap(mlbplayercontract, [('text')])
-
+    
     def mlbplayernews(self, irc, msg, args, optplayer):
         """<player name>
-	
-		Display latest news for player via Rotoworld.
+    
+        Display latest news for player via Rotoworld.
         Ex: Derek Jeter.
         """
-
+    
         # try and grab a player.
         url = self._pf('r', optplayer)
         if not url:
@@ -2170,30 +2230,30 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.find('div', attrs={'class':'playername'})
-	if not plrname:
-	    irc.reply("ERROR: I could not find player's name on: {0}".format(url))
-	    return
-	else:  # grab their name and stuff.
-	    plrname = plrname.find('h1').getText().encode('utf-8')
-	    plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
-	# now find the n00z.
-	div = soup.find('div', attrs={'class':'playernews'})
-	if not div:
-	    irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
-	    return
-	# we do have stuff. output.
-	irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
-	
+        plrname = soup.find('div', attrs={'class':'playername'})
+        if not plrname:
+            irc.reply("ERROR: I could not find player's name on: {0}".format(url))
+            return
+        else:  # grab their name and stuff.
+            plrname = plrname.find('h1').getText().encode('utf-8')
+            plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
+        # now find the n00z.
+        div = soup.find('div', attrs={'class':'playernews'})
+        if not div:
+            irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
+            return
+        # we do have stuff. output.
+        irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+    
     mlbplayernews = wrap(mlbplayernews, [('text')])
-
+    
     def mlbcareerstats(self, irc, msg, args, optplayer):
         """<player name>
-	
+    
         Display career totals and season averages for player.
         Ex: Don Mattingly or Rickey Henderson or Derek Jeter.
         """
-
+    
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2204,8 +2264,8 @@ class MLB(callbacks.Plugin):
                 irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
             # now exit regardless.
             return
-	# mangle url
-	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
+        # mangle url
+        url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
         # we do have url now. fetch it.
         html = self._httpget(url)
         if not html:
@@ -2214,34 +2274,34 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.findAll('h1')[1].getText().encode('utf-8')
-	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
-	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-	trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
-	#
-	if len(trs) != 2:
-	    irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
-	    return
-	# first row has two 2ds. lets list cmp this with some nifty one liner!.
-	#careertotals = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
-	#seasonavg = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
-	careertotals = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[0].findAll('td')[2:])}
-	seasonavg = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[1].findAll('td')[1:])}
-	seasonavg = self._so(seasonavg)  # format both.
-	careertotals = self._so(careertotals)
+        plrname = soup.findAll('h1')[1].getText().encode('utf-8')
+        table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+        trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
+        #
+        if len(trs) != 2:
+            irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
+            return
+        # first row has two 2ds. lets list cmp this with some nifty one liner!.
+        #careertotals = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[0].findAll('td')[2:])]
+        #seasonavg = [self._bold(colhead[i+2].getText()) + ": " + z.getText() for (i, z) in enumerate(trs[1].findAll('td')[1:])]
+        careertotals = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[0].findAll('td')[2:])}
+        seasonavg = {colhead[k+2].getText(): v.getText() for (k, v) in enumerate(trs[1].findAll('td')[1:])}
+        seasonavg = self._so(seasonavg)  # format both.
+        careertotals = self._so(careertotals)
         # output time.
         irc.reply("{0} :: Season Averages :: {1}".format(self._bold(plrname), " | ".join([i for i in seasonavg])))
         irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
-
+    
     mlbcareerstats = wrap(mlbcareerstats, [('text')])
-
+    
     def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
         """<year> <player name>
-
+    
         Fetch season stats for player.
         Ex: 2010 Derek Jeter
         """
-
+    
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2252,8 +2312,8 @@ class MLB(callbacks.Plugin):
                 irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
             # now exit regardless.
             return
-	# now replace the url so we can grab stats.
-	url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
+        # now replace the url so we can grab stats.
+        url = url.replace('/mlb/player/_/id/', '/mlb/player/stats/_/id/')
         # we do have url now. fetch it.
         html = self._httpget(url)
         if not html:
@@ -2262,54 +2322,54 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
-	table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
-	colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-	trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
-	# sanity check
-	if len(trs) == 0:
-	    print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
-	# container
-	st = collections.defaultdict(list)
-	# iterate over their stats.
-	for tr in trs:
-	    tds = tr.findAll('td')
-	    yr = tds[0].getText()
-	    tmp = {}  # tmp dict
-	    for (i, z) in enumerate(tds[1:]):  # mate them up with colhead. +1
-		tmp[colhead[i+1].getText()] = z.getText()  # inject.
-	    # once done, append tmp to st.
-	    st[int(yr)].append(tmp)
-	# now lets grab the year.
-	outstat = st.get(optyear)
-	# make sure we have that year.
-	if not outstat:
-	    irc.reply("ERROR: I did not find stats for {0} in {1}.".format(plrname, optyear))
-	    return
-	# lets format output.
-	outstr = []
-	# iterate over each item in the year.
-	for q in outstat:  # each item here is going to be a dictionary.
-	    outstr.append("{0}".format(self._ul(q['TEAM'])))
-	    # we do this a little different than normal stats.
-	    #for (k, v) in q.items():  # stat items.
-	    #	if k != 'TEAM':  # team injected above
-	    #		outstr.append("{0}: {1}".format(self._bold(k), v))
-	    t = {k: v for (k, v) in q.items() if k != 'TEAM'}  # put in dict.
-	    t = self._so(t)  # format it.
-	    outstr.extend(t)  # must extend (not append) list
-	# finally, output
-	irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
+        plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
+        table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+        trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
+        # sanity check
+        if len(trs) == 0:
+            print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
+        # container
+        st = collections.defaultdict(list)
+        # iterate over their stats.
+        for tr in trs:
+            tds = tr.findAll('td')
+            yr = tds[0].getText()
+            tmp = {}  # tmp dict
+            for (i, z) in enumerate(tds[1:]):  # mate them up with colhead. +1
+                tmp[colhead[i+1].getText()] = z.getText()  # inject.
+            # once done, append tmp to st.
+            st[int(yr)].append(tmp)
+        # now lets grab the year.
+        outstat = st.get(optyear)
+        # make sure we have that year.
+        if not outstat:
+            irc.reply("ERROR: I did not find stats for {0} in {1}.".format(plrname, optyear))
+            return
+        # lets format output.
+        outstr = []
+        # iterate over each item in the year.
+        for q in outstat:  # each item here is going to be a dictionary.
+            outstr.append("{0}".format(self._ul(q['TEAM'])))
+            # we do this a little different than normal stats.
+            #for (k, v) in q.items():  # stat items.
+            #   if k != 'TEAM':  # team injected above
+            #       outstr.append("{0}: {1}".format(self._bold(k), v))
+            t = {k: v for (k, v) in q.items() if k != 'TEAM'}  # put in dict.
+            t = self._so(t)  # format it.
+            outstr.extend(t)  # must extend (not append) list
+        # finally, output
+        irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
     
     mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
-
+    
     def mlbplayerinfo(self, irc, msg, args, optplayer):
         """<player name>
-
+    
         Display information about MLB player.
         Ex: Derek Jeter
         """
-
+    
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2328,31 +2388,31 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-	div = soup.find('div', attrs={'class':'mod-content'})
-	if not div:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return
-	# find their name.
-	pname = div.find('h1')
-	if not pname:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return	    
-	pdiv = div.find('div', attrs={'class':'player-bio'})
-	if not pdiv:
-	    irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-	    return
-	# now output.
-	irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
-
+        div = soup.find('div', attrs={'class':'mod-content'})
+        if not div:
+            irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+            return
+        # find their name.
+        pname = div.find('h1')
+        if not pname:
+            irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+            return      
+        pdiv = div.find('div', attrs={'class':'player-bio'})
+        if not pdiv:
+            irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
+            return
+        # now output.
+        irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
+    
     mlbplayerinfo = wrap(mlbplayerinfo, [('text')])
-
+    
     def mlbgamestats(self, irc, msg, args, optplayer):
         """<player name>
-
+    
         Fetch gamestats for player from current or past game.
         Ex: Derek Jeter
         """
-
+    
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2373,48 +2433,45 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
         maintable = soup.find('table', attrs={'class':'player-profile-container'})
-	mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
-	# have to look at what's in mtheader to determine the statline. we could probably consolidate this but
-	# its easier for me when I have to debug these.
-	if 'PREVIOUS GAME' in mtheader:  # previous game.
-	    # find the details of the previous game.
-	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
-	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-	    prevgametable = maintable.find('table', attrs={'class':'tablehead'})
-	    prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+        mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
+        # have to look at what's in mtheader to determine the statline. we could probably consolidate this but
+        # its easier for me when I have to debug these.
+        if 'PREVIOUS GAME' in mtheader:  # previous game.
+            # find the details of the previous game.
+            gamedetails = maintable.find('div', attrs={'class':'game-details'})
+            gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+            gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+            gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+            gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
+            prevgametable = maintable.find('table', attrs={'class':'tablehead'})
+            prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
             prevgame = prevgametable.findAll('tr')[1].findAll('td')
-	    if prevgame[0].getText() != "This Game":
-		irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
-		return
+            if prevgame[0].getText() != "This Game":
+                irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
+                return
             #statline = [self._bold(prevcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
-	    statline = {prevcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(prevgame[1:])}
-	    statline = self._so(statline)	    
-	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
-	elif "CURRENT GAME" in mtheader:
-	    gamedetails = maintable.find('div', attrs={'class':'game-details'})
-	    gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-	    gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-	    gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-	    gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-	    curgametable = maintable.find('table', attrs={'class':'tablehead'})
-	    curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            statline = {prevcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(prevgame[1:])}
+            statline = self._so(statline)       
+            irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
+        elif "CURRENT GAME" in mtheader:
+            gamedetails = maintable.find('div', attrs={'class':'game-details'})
+            gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
+            gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
+            gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
+            gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
+            curgametable = maintable.find('table', attrs={'class':'tablehead'})
+            curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
             curgame = curgametable.findAll('tr')[1].findAll('td')
-	    if curgame[0].getText() != "This Game":
-		irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
-		return
+            if curgame[0].getText() != "This Game":
+                irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
+                return
             #statline = [self._bold(curcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(curgame[1:])]
-	    statline = {curcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(curgame[1:])}
-	    statline = self._so(statline)
-	    irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
-	else:
-	    irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
-
+            statline = {curcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(curgame[1:])}
+            statline = self._so(statline)
+            irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
+        else:
+            irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
+    
     mlbgamestats = wrap(mlbgamestats, [('text')])
 
 Class = MLB
-
-
-# vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=250:
