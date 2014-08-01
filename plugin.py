@@ -816,33 +816,19 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
+        #soup = BeautifulSoup(html)
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        lastDate = soup.findAll('span', attrs={'class': 'time'})[0]  # used for days since.
-        divs = soup.findAll('div', attrs={'class': 'entry'})
-        # output list.
-        arrestlist = []
-        # each div is an arrest.
-        for div in divs:
-            title = div.find('h2').getText().encode('utf-8')
-            datet = div.find('span', attrs={'class': 'time'}).getText().encode('utf-8')
-            datet = self._dtFormat("%m/%d", datet, "%B %d, %Y")  # translate date.
-            arrestedfor = div.find('strong', text=re.compile('Team:'))  # this is tricky..
-            if arrestedfor:  # not always there.
-                matches = re.search(r'<strong>Team:.*?</strong>(.*?)<br />', arrestedfor.findParent('p').renderContents(), re.I| re.S| re.M)
-                if matches:  # and not always found.
-                    college = matches.group(1).replace('(MLB)','').encode('utf-8').strip()
-                else:  # if we don't find anything, None is fine.
-                    college = "None"
-            else:  # just default to none.
-                college = "None"
-            arrestlist.append("{0} :: {1} - {2}".format(datet, title, college))
-        # do some date math for days since.  (take last entry/date)
-        delta = datetime.datetime.strptime(str(lastDate.getText()), "%B %d, %Y").date() - datetime.date.today()
-        daysSince = abs(delta.days)
-        # output
-        irc.reply("{0} days since last MLB arrest".format(self._red(daysSince)))
-        for each in arrestlist[0:6]:  # only show 6.
-            irc.reply(each)
+        ars = soup.findAll('h2', attrs={'class':'blog-title'})
+        if len(ars) == 0:
+            irc.reply("No arrests found. Something break?")
+            return
+        else:
+            for ar in ars[0:5]:  # iterate over each.
+                ard = ar.findNext('div', attrs={'class':'blog-date'})
+                # text and cleanup.
+                ard = ard.getText().replace('Posted On', '')
+                # print.
+                irc.reply("{0} - {1}".format(ar.getText(), ard))
     
     mlbarrests = wrap(mlbarrests)
     
