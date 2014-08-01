@@ -512,6 +512,7 @@ class MLB(callbacks.Plugin):
 
     def mlbbox(self, irc, msg, args, optteam):
         """<team>
+        
         Displays current box store, if any, for game the team is in or played.
         Ex: NYY
         """
