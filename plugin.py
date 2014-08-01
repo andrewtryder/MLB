@@ -2317,6 +2317,10 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return None
+        # error check.
+        if "No statistics available." in html:
+            irc.reply("Sorry, no stats are available for: {0}".format(optplayer))
+            return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
