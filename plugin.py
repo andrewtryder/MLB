@@ -823,13 +823,20 @@ class MLB(callbacks.Plugin):
             irc.reply("No arrests found. Something break?")
             return
         else:
+            az = []  # empty list for arrests.
+            # iterate over each and inject to list.
             for ar in ars[0:5]:  # iterate over each.
                 ard = ar.findNext('div', attrs={'class':'blog-date'})
                 # text and cleanup.
                 ard = ard.getText().replace('Posted On', '')
                 # print.
-                irc.reply("{0} - {1}".format(ar.getText(), ard))
-    
+                az.append({'d':ard, 'a':ar.getText()})
+        # now lets create our output.
+        delta = datetime.datetime.strptime(str(az[0]['d']), "%B %d, %Y").date() - datetime.date.today()
+        daysSince = abs(delta.days)
+        # finally, output.
+        irc.reply("{0} days since last arrest :: {1}".format(self._red(daysSince), " | ".join([i['a'] + " " + i['d'] for i in az])))
+
     mlbarrests = wrap(mlbarrests)
     
     def mlbgamesbypos (self, irc, msg, args, optteam):
