@@ -1985,7 +1985,7 @@ class MLB(callbacks.Plugin):
     
     def mlbprob(self, irc, msg, args, optteam):
         """<TEAM>
-        Display the MLB probables for a team over the next 5 stars.
+        Display the MLB probables for a team over the next 5 starts.
         Ex: NYY.
         """
     
