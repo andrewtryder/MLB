@@ -2433,6 +2433,10 @@ class MLB(callbacks.Plugin):
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
         maintable = soup.find('table', attrs={'class':'player-profile-container'})
+        if not maintable:  # sanity check.
+            irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
+            return
+        # we did find the maintable.
         mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
         # have to look at what's in mtheader to determine the statline. we could probably consolidate this but
         # its easier for me when I have to debug these.
