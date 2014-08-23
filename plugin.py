@@ -2161,7 +2161,70 @@ class MLB(callbacks.Plugin):
         o = [self._bold(v) + ": " + d[v] for v in so if v in d]
         # we return the list.
         return o
-    
+
+    def milbplayerseason(self, irc, msg, args, optyear, optplayer):
+        """<YYYY> <player name>
+        
+        Display season stats, for season (YYYY), by player.
+        Ex: 2010 Mike Trout
+        """
+
+        # try and grab a player.
+        url = self._pf('br', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        div = soup.find('div', attrs={'class':'table_container'})
+        if not div:
+            irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
+            return
+        table = div.find('table')
+        if not table:
+            irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
+            return
+        # playername:
+        pn = soup.find('span', attrs={'id':'player_name'}).getText().encode('utf-8')
+        # columns. bad parsing on BS end. We don't know what comes back. lets do a neat trick here.
+        chz = table.find('thead').findAll('th')
+        ch = []
+        for i in chz:  # iterate over all.
+            ds = i['data-stat'].encode('utf-8')
+            dst = i.getText().encode('utf-8')
+            if len(ds) > len(dst):  # see what is longer.
+                ch.append(dst)
+            else:  # cheap but works.
+                ch.append(ds)
+        # now each row.
+        rows = table.find('tbody').findAll('tr')
+        # our container
+        y = collections.defaultdict(list)
+        for row in rows:
+            tds = row.findAll('td')
+            # first should be year.
+            yr = int(tds[0].getText().encode('utf-8'))
+            # rest of the text lets join it up.
+            rest = [ch[i+1] + ': ' + x.getText().encode('utf-8') for (i, x) in enumerate(tds[1:])]
+            # add into the dd.
+            y[yr].append(rest)
+        # try this on the output.
+        out = y.get(optyear)
+        if not out:  # we did NOT find year in their stats.
+            irc.reply("ERROR: I did not find {0} stats for {1}. I do have for: {2}".format(optyear, pn, " | ".join([str(z) for z in y.keys()])))
+            return
+        # we never know how many stops so lets just for loop it. can get floody/spammy.
+        for q in out:
+            irc.reply("{0} :: {1} :: {2}".format(self._red(pn), self._bold(optyear), " ".join(q)))
+
+    milbplayerseason = wrap(milbplayerseason, [('int'), ('text')])
+
     def milbplayerinfo(self, irc, msg, args, optplayer):
         """<player name>
         
