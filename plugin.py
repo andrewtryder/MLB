@@ -6,7 +6,7 @@
 #
 ###
 # my libs.
-from BeautifulSoup import BeautifulSoup
+from BeautifulSoup import BeautifulSoup, Comment
 import re
 import collections
 import datetime
@@ -2123,6 +2123,8 @@ class MLB(callbacks.Plugin):
             burl = "%s site:www.rotoworld.com/player/mlb/" % pname
         elif db == "s":  # st.
             burl = "%s site:www.spotrac.com/mlb/" % pname
+        elif db == "br":  # br.
+            burl = "%s site:www.baseball-reference.com/minors/" % pname
         # construct url (properly escaped)
         url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % burl.replace(' ', '%20')
         # now fetch url.
@@ -2142,6 +2144,9 @@ class MLB(callbacks.Plugin):
             return None
         # finally, return the first url.
         url = results[0]['url']
+        # lets manually urlquote BR.
+        if db == "br":
+            url = url.replace('%3F', '?').replace('%3D', '=')
         return url
     
     def _so(self, d):
@@ -2156,6 +2161,53 @@ class MLB(callbacks.Plugin):
         o = [self._bold(v) + ": " + d[v] for v in so if v in d]
         # we return the list.
         return o
+    
+    def milbplayerinfo(self, irc, msg, args, optplayer):
+        """<player name>
+        
+        Display minor league information about player.
+        Ex: Mike Trout
+        """
+
+        # try and grab a player.
+        url = self._pf('br', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        div = soup.find('div', attrs={'itemtype':'http://data-vocabulary.org/Person'}) 
+        if not div:
+            irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
+            return
+        # now grab their name.
+        n = div.find('span', attrs={'id':'player_name'})
+        pn = n.getText().encode('utf-8')
+        n.extract()
+        # remove ads/js.
+        [a.extract() for a in div.find('div', attrs={'class':'sr_draftstreet '})]
+        [s.extract() for s in div('script')]
+        # remove comments.
+        comments = div.findAll(text=lambda text:isinstance(text, Comment))
+        [comment.extract() for comment in comments]
+        # text.
+        t = div.getText(separator=' ').encode('utf-8')
+        t = ' '.join(t.split())  # n+1 space = one
+        # format for output.
+        irc.reply("{0} :: {1}".format(self._bold(pn), t))
+
+    milbplayerinfo = wrap(milbplayerinfo, [('text')])
     
     def mlbplayercontract(self, irc, msg, args, optplayer):
         """<player name>
