@@ -2173,11 +2173,6 @@ class MLB(callbacks.Plugin):
         url = self._pf('br', optplayer)
         if not url:
             irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
-            # lets try to help them out with similar names.
-            sp = self._similarPlayers(optplayer)
-            if sp:  # if we get something back, lets return the fullnames.
-                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
-            # now exit regardless.
             return
         # we do have url now. fetch it.
         html = self._httpget(url)
