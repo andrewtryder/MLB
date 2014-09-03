@@ -286,51 +286,7 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} :: {1}".format(self._bold(i), " | ".join(x)))
     
     mlbhittingstreaks = wrap(mlbhittingstreaks)
-    
-    def mlbplayoffchances(self, irc, msg, args, optteam):
-        """<team>
-        Display team's current playoff chances, ws chances, % to obtain seeds, RPI and SOS.
-        Ex: NYY
-        """
-    
-        # test for valid teams.
-        optteam = self._validteams(optteam)
-        if not optteam:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # build url and fetch.
-        url = self._b64decode('aHR0cDovL3d3dy5zcG9ydHNjbHVic3RhdHMuY29tL01MQi5odG1s')
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'id':'list'})
-        rows = table.findAll('tr', attrs={'class': re.compile('^team.*?')})
-        # dict container for output.
-        playoffs = collections.defaultdict(list)
-        # each row is a team.
-        for row in rows:
-            tds = [item.getText() for item in row.findAll('td')]  # save time/space doing this.
-            team = tds[0].lower()  # to match for translate team below.
-            team = self._translateTeam('team', 'playoffs', team)  # translate to mate with optteam.
-            # make the string to append as value below.
-            appendString = "make playoffs: {0} | win WS: {1} | % to obtain seed # :: 1. {2} 2. {3} 3. {4} 4. {5} 5. {6} | RPI: {7} | SOS: {8}".format(\
-                    self._bold(tds[9]), self._bold(tds[12]), self._bold(tds[16]), self._bold(tds[17]), self._bold(tds[18]), self._bold(tds[19]),\
-                    self._bold(tds[20]), self._bold(tds[32]), self._bold(tds[33]))
-            playoffs[team] = appendString
-        # output time.
-        output = playoffs.get(optteam)
-        if not output:
-            irc.reply("ERROR: I could not find playoff stats for: {0}.".format(optteam))
-            return
-        else:  # if we find it.
-            irc.reply("{0} chances :: {1}".format(self._red(optteam), output))
-    
-    mlbplayoffchances = wrap(mlbplayoffchances, [('somethingWithoutSpaces')])
-    
+        
     def mlbgameumps(self, irc, msg, args, optteam):
         """<team>
         
@@ -2210,8 +2166,15 @@ class MLB(callbacks.Plugin):
             tds = row.findAll('td')
             # first should be year.
             yr = int(tds[0].getText().encode('utf-8'))
-            # rest of the text lets join it up.
-            rest = [ch[i+1] + ': ' + x.getText().encode('utf-8') for (i, x) in enumerate(tds[1:])]
+            # output.
+            rest = []
+            # rest of the text lets join it up. we iterate over each so we can cherrypick.
+            for (i, x) in enumerate(tds[1:]):
+                xch = ch[i+1]
+                xt = x.getText().encode('utf-8')
+                if xch == "age_diff":
+                    continue
+                rest.append("{0}: {1}".format(xch, xt))
             # add into the dd.
             y[yr].append(rest)
         # try this on the output.
