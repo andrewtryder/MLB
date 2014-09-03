@@ -1522,7 +1522,7 @@ class MLB(callbacks.Plugin):
         """
     
         # first, check getopts for what to display.
-        full, expanded, vsdivision = False, False, False
+        full, expanded, vsdivision, wl = False, False, False, False
         for (option, arg) in optlist:
             if option == 'full':
                 full = True
@@ -1530,6 +1530,8 @@ class MLB(callbacks.Plugin):
                 expanded = True
             if option == 'vsdivision':
                 vsdivision = True
+            if option == 'wl':
+                wl = True
         # now check optdiv for the division.
         optdiv = optdiv.upper() # upper to match keys. values are in the table to match with the html.
         leaguetable =   {'ALE': 'American League EAST',
@@ -1600,7 +1602,11 @@ class MLB(callbacks.Plugin):
         if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # redundant method to handle the wild-card but we need it.
             wcstandings = []  # list for output.
             for i, each in enumerate(object_list[1:7]):  # only display 1-5.
-                wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
+                if wl:  # if we should display win-loss.
+                   wcstandings.append("#{0} {1} ({2}-{3}) {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB']))
+                   #wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
+                else:  # regular, no w-l
+                    wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
             irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(wcstandings)))
         else:  # non wild-card stuff.
             if ((not full) and (not expanded) and (not vsdivision)):  # display short.
@@ -1626,7 +1632,7 @@ class MLB(callbacks.Plugin):
                                 tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
                         irc.reply(tableRow)  # output.
     
-    mlbstandings = wrap(mlbstandings, [getopts({'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
+    mlbstandings = wrap(mlbstandings, [getopts({'wl':'', 'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
     
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
