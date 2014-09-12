@@ -2320,7 +2320,12 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
             return
         # we do have stuff. output.
-        irc.reply("{0} :: {1}".format(self._bold(plrname), div.getText().encode('utf-8')))
+        playerNews = div.getText().encode('utf-8')
+        # remove html tags before.
+        TAG_RE = re.compile(r'<[^>]+>')
+        playerNews = TAG_RE.sub('', playerNews)
+        # output.
+        irc.reply("{0} :: {1}".format(self._bold(plrname), playerNews))
     
     mlbplayernews = wrap(mlbplayernews, [('text')])
     
