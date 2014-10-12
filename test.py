@@ -21,8 +21,11 @@ class MLBTestCase(PluginTestCase):
         # mlbweather, and mlbworldseries
         self.assertNotError('milbplayerinfo Mike Trout')
         self.assertNotError('milbplayerseason 2010 mike trout')
-        self.assertNotError('@mlballstargame 2013')
+        self.assertNotError('mlballstargame 2013')
         self.assertNotError('mlbarrests')
         self.assertNotError('mlbawards 2013')
+        self.assertNotError('mlbbox NYY')
+        self.assertNotError('mlbcareerleaders batting batavg')
+
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
