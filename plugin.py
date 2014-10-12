@@ -2223,7 +2223,7 @@ class MLB(callbacks.Plugin):
         pn = n.getText().encode('utf-8')
         n.extract()
         # remove ads/js.
-        [a.extract() for a in div.find('div', attrs={'class':'sr_draftstreet '})]
+        #[a.extract() for a in div.find('div', attrs={'class':'sr_draftstreet '})]
         [s.extract() for s in div('script')]
         # remove comments.
         comments = div.findAll(text=lambda text:isinstance(text, Comment))
