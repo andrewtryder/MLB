@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-##
-# Copyright (c) 2012-2014, spline
-# All rights reserved.
-#
-#
 ###
+# see LICENSE.txt for information.
+###
+
 # my libs.
 from BeautifulSoup import BeautifulSoup, Comment
+from urllib import quote_plus
+import requests
 import re
 import collections
 import datetime
@@ -33,56 +33,56 @@ class MLB(callbacks.Plugin):
     """Add the help for "@plugin help MLB" here
     This should describe *how* to use this plugin."""
     threaded = True
-    
+
     def __init__(self, irc):
         self.__parent = super(MLB, self)
         self.__parent.__init__(irc)
         self._mlbdb = os.path.abspath(os.path.dirname(__file__)) + '/db/mlb.db'
-    
+
     def die(self):
         self.__parent.die()
-    
+
     ##############
     # FORMATTING #
     ##############
-    
+
     def _red(self, string):
         """Returns a red string."""
         return ircutils.mircColor(string, 'red')
-    
+
     def _yellow(self, string):
         """Returns a yellow string."""
         return ircutils.mircColor(string, 'yellow')
-    
+
     def _green(self, string):
         """Returns a green string."""
         return ircutils.mircColor(string, 'green')
-    
+
     def _bold(self, string):
         """Returns a bold string."""
         return ircutils.bold(string)
-    
+
     def _blue(self, string):
         """Returns a blue string."""
         return ircutils.mircColor(string, 'blue')
-    
+
     def _ul(self, string):
         """Returns an underline string."""
         return ircutils.underline(string)
-    
+
     def _bu(self, string):
         """Returns a bold/underline string."""
         return ircutils.bold(ircutils.underline(string))
-    
+
     ######################
     # INTERNAL FUNCTIONS #
     ######################
-    
+
     def _splicegen(self, maxchars, stringlist):
         """Return a group of splices from a list based on the maxchars
         string-length boundary.
         """
-    
+
         runningcount = 0
         tmpslice = []
         for i, item in enumerate(stringlist):
@@ -94,29 +94,29 @@ class MLB(callbacks.Plugin):
                 tmpslice = [i]
                 runningcount = len(item)
         yield(tmpslice)
-    
+
     def _batch(self, iterable, size):
         """http://code.activestate.com/recipes/303279/#c7"""
-    
+
         c = count()
         for k, g in groupby(iterable, lambda x:c.next()//size):
             yield g
-    
+
     def _validate(self, date, format):
         """Return true or false for valid date based on format."""
-    
+
         try:
             datetime.datetime.strptime(str(date), format) # format = "%m/%d/%Y"
             return True
         except ValueError:
             return False
-    
+
     def _httpget(self, url, h=None, d=None, l=True):
         """General HTTP resource fetcher. Pass headers via h, data via d, and to log via l."""
-    
+
         if self.registryValue('logURLs') and l:
             self.log.info(url)
-    
+
         try:
             if h and d:
                 page = utils.web.getUrl(url, headers=h, data=d)
@@ -127,51 +127,51 @@ class MLB(callbacks.Plugin):
         except Exception as e:
             self.log.error("ERROR opening {0} message: {1}".format(url, e))
             return None
-    
+
     def _b64decode(self, string):
         """Returns base64 decoded string."""
-    
+
         return b64decode(string)
-    
+
     def _dtFormat(self, outfmt, instring, infmt):
         """Convert from one dateformat to another."""
-    
+
         try:
             d = datetime.datetime.strptime(instring, infmt)
             output = d.strftime(outfmt)
         except:
             output = instring
         return output
-    
+
     def _millify(self, num):
         """Turns a number like 1,000,000 into 1M."""
-    
+
         for unit in ['','k','M','B','T']:
             if num < 1000.0:
                 return "%3.3f%s" % (num, unit)
             num /= 1000.0
-    
+
     ######################
     # DATABASE FUNCTIONS #
     ######################
-    
+
     def _allteams(self):
         """Return a list of all valid teams (abbr)."""
-    
+
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "SELECT team FROM mlb"
             cursor.execute(query)
             teamlist = [item[0] for item in cursor.fetchall()]
-    
+
         return " | ".join(sorted(teamlist))
-    
+
     def _validteams(self, optteam):
         """Takes optteam as input function and sees if it is a valid team.
         Aliases are supported via mlbteamaliases table.
         Returns a 1 upon error (no team name nor alias found.)
         Returns the team's 3-letter (ex: NYY or ARI) if successful."""
-    
+
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             query = "SELECT team FROM mlbteamaliases WHERE teamalias=?"  # check aliases first.
@@ -189,10 +189,10 @@ class MLB(callbacks.Plugin):
                 returnval = str(aliasrow[0])
         # return time.
         return returnval
-    
+
     def _translateTeam(self, db, column, optteam):
         """Translates optteam (validated via _validteams) into proper string using database column."""
-    
+
         with sqlite3.connect(self._mlbdb) as conn:
             cursor = conn.cursor()
             # query = "SELECT %s FROM mlb WHERE %s='%s'" % (db, column, optteam)
@@ -200,38 +200,38 @@ class MLB(callbacks.Plugin):
             # cursor.execute(query)
             cursor.execute(query, (optteam,))
             row = cursor.fetchone()
-    
+
         return (str(row[0]))
-    
+
     ####################
     # PUBLIC FUNCTIONS #
     ####################
-    
+
     def mlbcountdown(self, irc, msg, args):
         """
         Display countdown until next MLB opening day.
         """
-    
+
         y = 2014
         oDay = (datetime.datetime(y, 03, 30) - datetime.datetime.now()).days
         irc.reply("{0} day(s) until {1} MLB Opening Day.".format(oDay, y))
-    
+
     mlbcountdown = wrap(mlbcountdown)
-    
+
     def mlbteams(self, irc, msg, args):
         """
         Display a list of valid teams for input.
         """
-    
+
         irc.reply("Valid MLB teams are: {0}".format(self._allteams()))
-    
+
     mlbteams = wrap(mlbteams)
-    
+
     def mlbchanlineup(self, irc, msg, args):
         """
         Display a random lineup for channel users.
         """
-    
+
         if not ircutils.isChannel(msg.args[0]):  # make sure its run in a channel.
             irc.reply("ERROR: Must be run from a channel.")
             return
@@ -250,14 +250,14 @@ class MLB(callbacks.Plugin):
             lineup.append("{0}{1}".format(self._bold(a), position))
         # now output.
         irc.reply("{0} ALL-STAR LINEUP :: {1}".format(self._red(msg.args[0]), ", ".join(lineup)))
-    
+
     mlbchanlineup = wrap(mlbchanlineup)
-    
+
     def mlbhittingstreaks(self, irc, msg, args):
         """
         Display this year's longest hitstreaks in AL and NL.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9oaXR0aW5nc3RyZWFrcw==')
         html = self._httpget(url)
@@ -284,16 +284,16 @@ class MLB(callbacks.Plugin):
         irc.reply("{0}".format(self._blue(title)))
         for i, x in mlbstreaks.items():
             irc.reply("{0} :: {1}".format(self._bold(i), " | ".join(x)))
-    
+
     mlbhittingstreaks = wrap(mlbhittingstreaks)
-        
+
     def mlbgameumps(self, irc, msg, args, optteam):
         """<team>
-        
+
         Display current umpires in game involving team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -350,15 +350,15 @@ class MLB(callbacks.Plugin):
             gameinfo = soup.find('div', attrs={'id':re.compile('matchup-mlb-.*')}).getText(separator=' ').encode('utf-8')
             # now output.
             irc.reply("{0} :: {1}".format(gameinfo, umptd))
-            
+
     mlbgameumps = wrap(mlbgameumps, [('somethingWithoutSpaces')])
-        
+
     def mlbpitcher(self, irc, msg, args, optteam):
         """<team>
         Displays current pitcher(s) and stats in active or previous game for team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -463,16 +463,16 @@ class MLB(callbacks.Plugin):
                 return
             else:  # ok, things did work.
                 irc.reply("{0} :: {1}".format(self._red(optteam), " | ".join(output)))
-    
+
     mlbpitcher = wrap(mlbpitcher, [('somethingWithoutSpaces')])
 
     def mlbbox(self, irc, msg, args, optteam):
         """<team>
-        
+
         Displays current box store, if any, for game the team is in or played.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -538,15 +538,15 @@ class MLB(callbacks.Plugin):
         irc.reply("{0:22} {1:<2} {2:<2} {3:<2}".format(self._bold(bs['status']), "R", "H", "E"))
         irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['awayteam'], bs['awayruns'], bs['awayhits'], bs['awayerrors']))
         irc.reply("{0:20} {1:<2} {2:<2} {3:<2}".format(bs['hometeam'], bs['homeruns'], bs['homehits'], bs['homeerrors']))
-    
+
     mlbbox = wrap(mlbbox, [('somethingWithoutSpaces')])
- 
+
     def mlbworldseries(self, irc, msg, args, optyear):
         """<YYYY>
         Display results for a MLB World Series that year. Earliest year is 1903 and latest is the last postseason.
         Ex: 2000.
         """
-    
+
         # test for valid date.
         testdate = self._validate(optyear, '%Y')
         if not testdate:
@@ -580,14 +580,14 @@ class MLB(callbacks.Plugin):
             return
         else:  # we have the world series.
             irc.reply("{0} World Series :: {1}".format(self._red(optyear), outyear))
-    
+
     mlbworldseries = wrap(mlbworldseries, [('int')])
-    
+
     def mlballstargame(self, irc, msg, args, optyear):
         """<YYYY>
         Display results for that year's MLB All-Star Game. Ex: 1996. Earliest year is 1933 and latest is this season.
         """
-    
+
         # first test year.
         testdate = self._validate(optyear, '%Y')
         if not testdate:
@@ -616,14 +616,14 @@ class MLB(callbacks.Plugin):
             return
         else:  # we do have a year/game.
             irc.reply("{0} All-Star Game :: {1}".format(self._red(optyear), outyear))
-    
+
     mlballstargame = wrap(mlballstargame, [('int')])
-    
+
     def mlbcyyoung(self, irc, msg, args):
         """
         Display Cy Young prediction list. Uses a method, based on past results, to predict Cy Young balloting.
         """
-    
+
         # build and fetch URL.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9mZWF0dXJlcy9jeXlvdW5n')
         html = self._httpget(url)
@@ -645,15 +645,15 @@ class MLB(callbacks.Plugin):
         # output time.
         for i, x in cyyoung.iteritems():
             irc.reply("{0} :: {1}".format(self._red(i), " | ".join([item for item in x])))
-    
+
     mlbcyyoung = wrap(mlbcyyoung)
-    
+
     def mlbseries(self, irc, msg, args, optteam, optopp):
         """<team> <opp>
         Display the remaining games between TEAM and OPP in the current schedule.
         Ex: NYY TOR
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -703,14 +703,14 @@ class MLB(callbacks.Plugin):
         else:  # no remaining games found.
             irc.reply("I do not see any remaining games between: {0} and {1} in the {2} schedule.".format(\
                 self._bold(optteam), self._bold(optopp), datetime.date.today().year))
-    
+
     mlbseries = wrap(mlbseries, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-    
+
     def mlbejections(self, irc, msg, args):
         """
         Display the total number of ejections and five most recent for the MLB season.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL3BvcnRhbC5jbG9zZWNhbGxzcG9ydHMuY29tL2hpc3RvcmljYWwtZGF0YS8=') + str(datetime.datetime.now().year) + '-mlb-ejections-replay-reviews'
         html = self._httpget(url)
@@ -756,14 +756,14 @@ class MLB(callbacks.Plugin):
         pe = "Players/Managers ejected most :: {0}".format(" | ".join([k + "(" + str(v) + ")" for (k,v) in playercounter.most_common(3)]))
         irc.reply("{0} || {1}".format(uc, pe))
         irc.reply(" | ".join([item for item in append_list]))
-    
+
     mlbejections = wrap(mlbejections)
-    
+
     def mlbarrests(self, irc, msg, args):
         """
         Display the last 5 MLB arrests.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2FycmVzdG5hdGlvbi5jb20vY2F0ZWdvcnkvcHJvLWJhc2ViYWxsLw==')
         html = self._httpget(url)
@@ -794,13 +794,13 @@ class MLB(callbacks.Plugin):
         irc.reply("{0} days since last arrest :: {1}".format(self._red(daysSince), " | ".join([i['a'] + " " + i['d'] for i in az])))
 
     mlbarrests = wrap(mlbarrests)
-    
+
     def mlbgamesbypos (self, irc, msg, args, optteam):
         """<team>
         Display a team's games by position.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -829,16 +829,16 @@ class MLB(callbacks.Plugin):
         output = "{0} (games by POS) :: {1}".format(self._red(optteam.upper()), descstring)
         # output.
         irc.reply(output)
-    
+
     mlbgamesbypos = wrap(mlbgamesbypos, [('somethingWithoutSpaces')])
-    
+
     def mlbroster(self, irc, msg, args, optlist, optteam):
         """[--40man|--active] <team>
         Display active roster for team.
         Defaults to active roster but use --40man switch to show the entire roster.
         Ex: --40man NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -878,16 +878,16 @@ class MLB(callbacks.Plugin):
         # output time.
         for i, j in team_data.iteritems():  # output one line per position.
             irc.reply("{0} {1} :: {2}".format(self._red(optteam.upper()), self._bold(i), " | ".join([item for item in j])))
-    
+
     mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
-    
+
     def mlbrosterstats(self, irc, msg, args, optteam):
         """[team]
         Displays top 5 youngest/oldest teams.
         Optionally, use TEAM as argument to display roster stats/averages for MLB team.
         Ex: NYY
         """
-    
+
         if optteam:  # if we want a specific team, validate it.
             optteam = self._validteams(optteam)
             if not optteam:  # team is not found in aliases or validteams.
@@ -940,12 +940,12 @@ class MLB(callbacks.Plugin):
              # above, first five are the youngest. oldest = last five.
             output = "{0} :: {1}".format(self._bold("5 Oldest MLB Teams:"), " | ".join([item['team'] for item in object_list[-6:-1]]))
             irc.reply(output)
-    
+
     mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
-    
+
     def _format_cap(self, figure):
         """Format cap numbers for mlbpayroll command."""
-    
+
         figure = figure.replace(',', '').strip()  # remove commas.
         if figure.startswith('-'):  # figure out if we're a negative number.
             negative = True
@@ -962,13 +962,13 @@ class MLB(callbacks.Plugin):
             figure = "-" + figure
         # now return
         return figure
-    
+
     def mlbpayroll(self, irc, msg, args, optteam):
         """<team>
         Display payroll situation for <team>.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1001,15 +1001,15 @@ class MLB(callbacks.Plugin):
         totalcap = self._format_cap(rows[3].find('span', attrs={'class':'cap total'}).getText())  # specific one.
         # output
         irc.reply("{0} :: Total Cap: {1} :: {2}".format(self._bold(teamtitle.getText()), totalcap, " | ".join([item for item in payroll])))
-    
+
     mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
-    
+
     def mlbweather(self, irc, msg, args, optteam):
         """<team>
         Display weather for MLB team at park they are playing at.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1045,7 +1045,7 @@ class MLB(callbacks.Plugin):
                 weather = "[ROOF] " + weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
             else:
                 weather = weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
-    
+
             # now do some split work to get the dict with teams as keys.
             teams = matchup.getText().split(',', 1)  # NYY at DET, 1:05PM ET
             # now, left with TEAM at TEAM. foreach on both to append to dict.
@@ -1059,14 +1059,14 @@ class MLB(callbacks.Plugin):
             irc.reply(output)
         else:  # team not found.
             irc.reply("ERROR: No weather found for: {0}. Perhaps the team is not playing?".format(optteam))
-    
+
     mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
-    
+
     def mlbvaluations(self, irc, msg, args):
         """
         Display current MLB team valuations from Forbes.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL3d3dy5mb3JiZXMuY29tL21sYi12YWx1YXRpb25zL2xpc3Qv')
         html = self._httpget(url)
@@ -1090,16 +1090,16 @@ class MLB(callbacks.Plugin):
         # output.
         irc.reply("{0} (in millions) :: {1}".format(self._red("Current MLB Team Values"), self._bold(updated)))
         irc.reply("{0}".format(" | ".join([item for item in object_list])))
-    
+
     mlbvaluations = wrap(mlbvaluations)
-    
+
     def mlbremaining(self, irc, msg, args, optteam):
         """<team>
         Display remaining games/schedule for a playoff contender.
         NOTE: Will only work closer toward the end of the season.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1130,18 +1130,18 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} not listed. Not considered a playoff contender.".format(optteam))
         else:  # team is found.
             irc.reply("{0} :: {1}".format(self.bold(optteam), (" ".join(output))))
-    
+
     mlbremaining = wrap(mlbremaining, [('somethingWithoutSpaces')])
-    
+
     def mlbleaders(self, irc, msg, args, optlist, optleague, optstat):
         """<mlb|nl|al> <statname>
-    
+
         Display MLB/AL/NL leaders in various stat categories.
         Valid categories: AVG, HR, RBI, R, OBP, SLUGGING, OPS, SB, W, ERA, SO, S, WHIP
-        
+
         Ex: mlb ops
         """
-    
+
         # first, we declare our very long list of categories. used for validity/matching/url and the help.
         stats = {
         'AVG':'avg',
@@ -1202,14 +1202,14 @@ class MLB(callbacks.Plugin):
             mlbstats.append("{0}. {1} ({2})".format(rk, plr, st))
         # now we prepare the output.
         irc.reply("MLB LEADERS IN {0}({1}) :: {2}".format(self._ul(optstat), self._bold(optleague), " | ".join(mlbstats)))
-    
+
     mlbleaders = wrap(mlbleaders, [getopts({'postseason':'', 'bottom':''}), ('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-    
+
     def mlbplayoffs(self, irc, msg, args, optleague):
         """<AL|NL>
         Display playoff matchups if season ended today.
         """
-    
+
         # validate league for url.
         optleague = optleague.upper()
         if optleague == "AL":
@@ -1239,16 +1239,16 @@ class MLB(callbacks.Plugin):
         # now prepare to output. have to order the matchups string.
         matchups = "(WC: {1} vs. {2}) vs. {0} || {3} vs. {4}".format(teams[0], teams[3], teams[4], teams[1], teams[2])
         irc.reply("{0} :: {1}".format(self._red(title), matchups))
-    
+
     mlbplayoffs = wrap(mlbplayoffs, [('somethingWithoutSpaces')])
-    
+
     def mlbcareerleaders(self, irc, msg, args, optplayertype, optcategory):
         """<batting|pitching> <category>
         Display career stat leaders in batting|pitching <category>
         Must specify batting or pitching, along with stat from either category.
         Ex: batting batavg OR pitching wins
         """
-    
+
         battingcategories = { 'batavg':'batting_avg', 'onbasepct':'onbase_perc', 'sluggingpct':'slugging_perc' ,
                             'onbaseplusslugging':'onbase_plus_slugging', 'gamesplayedAB':'G', 'atbats':'AB', 'plateappear':'PA',
                             'runsscored':'R', 'hitsAB':'H', 'totalbases':'TB', 'doubles':'2B', 'triples':'3B', 'homeruns':'HR',
@@ -1266,7 +1266,7 @@ class MLB(callbacks.Plugin):
                             'losses':'L', 'earnedruns':'ER', 'wildpitches':'WP', 'hitbypitch':'HBP_p', 'battersfaced':'batters_faced',
                             'gamesfinished':'GF', 'adjustedERAplus':'earned_run_avg_plus', 'adjpitchingruns':'apRuns', 'adjpitchingwins':'apWins'
                             }
-    
+
         # have to match a k/v in each dict with batting or pitching.
         optplayertype = optplayertype.lower()  # first lower optplayertype
         if optplayertype == "batting":  # check if issued batting w/o a category.
@@ -1323,15 +1323,15 @@ class MLB(callbacks.Plugin):
             self._bold(optcategory), self._ul("UNDERLINE"))
         irc.reply(output)  # header.
         irc.reply(" | ".join([item for item in object_list]))  # now our top10.
-    
+
     mlbcareerleaders = wrap(mlbcareerleaders, [('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
-    
+
     def mlbawards(self, irc, msg, args, optyear):
         """<year>
         Display various MLB award winners for current (or previous) year. Use YYYY for year.
         Ex: 2011
         """
-    
+
         # test if we have date or not.
         if optyear:   # crude way to find the latest awards.
             testdate = self._validate(optyear, '%Y')
@@ -1376,15 +1376,15 @@ class MLB(callbacks.Plugin):
             self._bold(alroy), self._bold(nlroy), self._bold(almgr), self._bold(nlmgr))
         # actually output.
         irc.reply(output)
-    
+
     mlbawards = wrap(mlbawards, [optional('int')])
-    
+
     def mlbschedule(self, irc, msg, args, optteam):
         """<team>
         Display the next five upcoming games for team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1404,7 +1404,7 @@ class MLB(callbacks.Plugin):
         div = soup.find('div', attrs={'id':'my-teams-table'})
         table = div.find('table', attrs={'class':'tablehead'})
         trs = table.findAll('tr', attrs={'class':re.compile('^evenrow.*|^oddrow.*')})
-        # 
+        #
         container = []
         #
         for (i, tr) in enumerate(trs):
@@ -1432,14 +1432,14 @@ class MLB(callbacks.Plugin):
         # prepare output string and output.
         descstring = " | ".join([item for item in schedule])
         irc.reply("{0} :: {1}".format(self._bold(optteam), descstring))
-    
+
     mlbschedule = wrap(mlbschedule, [('somethingWithoutSpaces')])
-    
+
     def mlbdailyleaders(self, irc, msg, args):
         """
         Display MLB daily leaders.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGF0cy9kYWlseWxlYWRlcnM=')
         html = self._httpget(url)
@@ -1447,7 +1447,7 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
-        # process html. 
+        # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         mlbdate = soup.find('h1', attrs={'class':'h2'})
         div = soup.find('div', attrs={'id':'my-players-table'})
@@ -1468,15 +1468,15 @@ class MLB(callbacks.Plugin):
             mlbdailyleaders.append("{0}. {1}".format(i+1, plr))
         # now output.
         irc.reply("{0} :: {1}".format(self._bold(mlbdate.getText()), " ".join([i for i in mlbdailyleaders])))
-    
+
     mlbdailyleaders = wrap(mlbdailyleaders)
-    
+
     def mlbmanager(self, irc, msg, args, optteam):
         """<team>
         Display the manager for team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1509,18 +1509,18 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Something went horribly wrong looking up the manager for: {0}".format(optteam))
         else:  # we found so output.
             irc.reply(output)
-    
+
     mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
-    
+
     def mlbstandings(self, irc, msg, args, optlist, optdiv):
         """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW|ALWC|NLWC>
-    
+
         Display divisional standings for a division.
         Can also display wild-card standings via ALWC or NLWC.
         Use --full or --expanded or --vsdivision to show extended stats.
         Ex: --full ALC or --expanded ALE.
         """
-    
+
         # first, check getopts for what to display.
         full, expanded, vsdivision, wl = False, False, False, False
         for (option, arg) in optlist:
@@ -1545,7 +1545,7 @@ class MLB(callbacks.Plugin):
         if optdiv not in leaguetable:  # make sure keys are present.
             irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
             return
-    
+
         # build and fetch url. diff urls depending on option.
         if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # special url for WC.
             url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3dpbGQtY2FyZA0K')
@@ -1631,15 +1631,15 @@ class MLB(callbacks.Plugin):
                             else:  # rest of the elements outside the team.
                                 tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
                         irc.reply(tableRow)  # output.
-    
+
     mlbstandings = wrap(mlbstandings, [getopts({'wl':'', 'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
-    
+
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
         Gets lineup for MLB team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1659,7 +1659,7 @@ class MLB(callbacks.Plugin):
         # process html. this is kinda icky.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         div = soup.find('div', attrs={'class':'team-lineup highlight'})
-        divs = div.findAll('div')   
+        divs = div.findAll('div')
         # 20140330 - had to fix this again.
         gmdate = divs[1].getText()  # date of game.
         seconddiv = divs[3]   # opp pitcher.
@@ -1674,16 +1674,16 @@ class MLB(callbacks.Plugin):
             lineup = " | ".join([i.getText(separator=' ').encode('utf-8') for i in lineup])
         # output.
         irc.reply("{0} LINEUP :: ({1}, {2}) :: {3}".format(self._bold(optteam), gmdate, otherpitcher, lineup))
-    
+
     mlblineup = wrap(mlblineup, [('somethingWithoutSpaces')])
-    
+
     def mlbinjury(self, irc, msg, args, optlist, optteam):
         """[--details] <team>
         Show all injuries for team.
         Use --details to display full table with team injuries.
         Ex: --details BOS or NYY
         """
-    
+
         # handle optlist (getopts)
         details = False
         for (option, arg) in optlist:
@@ -1735,14 +1735,14 @@ class MLB(callbacks.Plugin):
         else:  # no detail.
             irc.reply("{0} :: {1} Injuries".format(self._red(optteam), len(object_list)))
             irc.reply(" | ".join([item['name'] + " (" + item['returns'] + ")" for item in object_list]))
-    
+
     mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
-    
+
     def mlbpowerrankings(self, irc, msg, args):
         """
         Display this week's MLB Power Rankings.
         """
-    
+
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9wb3dlcnJhbmtpbmdz')
         html = self._httpget(url)
@@ -1772,15 +1772,15 @@ class MLB(callbacks.Plugin):
             powerrankings.append("{0}. {1} (prev: {2})".format(rank, team, lastweek))
         # now output.
         irc.reply("{0} :: {1}".format(self._bold(headline.getText()), " | ".join([i for i in powerrankings])))
-    
+
     mlbpowerrankings = wrap(mlbpowerrankings)
-    
+
     def mlbteamleaders(self, irc, msg, args, optteam, optcategory):
         """<team> <category>
         Display leaders on a team in stats for a specific category.
         Ex. NYY hr or LAD ops
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1817,16 +1817,16 @@ class MLB(callbacks.Plugin):
         # prepare output and output.
         thelist = " | ".join([item for item in object_list])
         irc.reply("{0} leaders for {1} :: {2}".format(self._red(optteam), self._bold(optcategory.upper()), thelist))
-    
+
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-    
+
     def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
         """<MLB|AL|NL> <category>
         Display top 10 teams in category for a specific stat.
         Categories: hr, avg, rbi, ra, sb, era, whip, k
         Ex: MLB hr or AL rbi or NL era
         """
-    
+
         # establish valid leagues and valid categories.
         league = {'mlb': '9', 'al':'7', 'nl':'8'}  # do our own translation here for league/category.
         category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'ra':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
@@ -1862,15 +1862,15 @@ class MLB(callbacks.Plugin):
         # output
         thelist = " | ".join([item for item in append_list])
         irc.reply("Leaders in {0} for {1} :: {2}".format(self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
-    
+
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
-    
+
     def mlbteamtrans(self, irc, msg, args, optteam):
         """<team>
         Shows recent MLB transactions for a team.
         Ex: NYY
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1896,16 +1896,16 @@ class MLB(callbacks.Plugin):
                 if "href=" not in str(item):
                     trans = item.findAll(text=True)
                     irc.reply("{0:8} {1}".format(self._bold(trans[0]), trans[1]))
-    
+
     mlbteamtrans = wrap(mlbteamtrans, [('somethingWithoutSpaces')])
-    
+
     def mlbtrans(self, irc, msg, args, optdate):
         """[YYYYmmDD]
         Display all mlb transactions. Will only display today's.
         Use date in format: 20120912 to display other dates.
         Ex: 20130525.
         """
-    
+
         # do we have a date or not?
         if optdate:  # if we have a date, test it out if it's valid.
             try:
@@ -1929,7 +1929,7 @@ class MLB(callbacks.Plugin):
         # if we do have transactions, process HTML.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         t1 = soup.findAll('div', attrs={'class':re.compile('ind alt|ind')})
-    
+
         if len(t1) < 1:  # nothing found.
             irc.reply("ERROR: I did not find any MLB transactions for: {0}".format(optdate))
             return
@@ -1942,15 +1942,15 @@ class MLB(callbacks.Plugin):
                         team = match1.group(1)  # shorten here?
                         transaction = match1.group(2)
                         irc.reply("{0} - {1}".format(self._bold(team), transaction))
-    
+
     mlbtrans = wrap(mlbtrans, [optional('somethingWithoutSpaces')])
-    
+
     def mlbprob(self, irc, msg, args, optteam):
         """<TEAM>
         Display the MLB probables for a team over the next 5 starts.
         Ex: NYY.
         """
-    
+
         # test for valid teams.
         optteam = self._validteams(optteam)
         if not optteam:  # team is not found in aliases or validteams.
@@ -1997,26 +1997,26 @@ class MLB(callbacks.Plugin):
             if optteam in eachentry['matchup']:  # if optteam is contained in matchup, we output.
                 irc.reply("{0:10} {1:25} {2:4} {3:15} {4:15} {5:4} {6:15} {7:15}".format(eachentry['date'], eachentry['matchup'],\
                     eachentry['vteam'], eachentry['vpitcher'],eachentry['vpstats'], eachentry['hteam'], eachentry['hpitcher'], eachentry['hpstats']))
-    
+
     mlbprob = wrap(mlbprob, [('somethingWithoutSpaces')])
-    
+
     #############################
     # PLAYER FIND / STATS STUFF #
     #############################
-    
+
     def _sanitizeName(self, name):
         """ Sanitize name. """
-    
+
         name = name.lower()  # lower.
         name = name.strip('.')  # remove periods.
         name = name.strip('-')  # remove dashes.
         name = name.strip("'")  # remove apostrophies.
         # possibly strip jr/sr/III suffixes in here?
         return name
-    
+
     def _similarPlayers(self, optname):
         """Return a dict containing the five most similar players based on optname."""
-    
+
         url = self._b64decode('aHR0cHM6Ly9lcmlrYmVyZy5jb20vbWxiL3BsYXllcnM=')
         html = self._httpget(url)
         if not html:
@@ -2066,57 +2066,53 @@ class MLB(callbacks.Plugin):
             self.log.info("_similarPlayers :: NO MATCHES for {0} :: {1}".format(optname, matching))
         # return matching now.
         return matching
-    
+
     def _pf(self, db, pname):
         """<e|r|s> <player>
-        
+
         Find a player's page via google ajax. Specify DB based on site.
         """
-    
-        # first, figure out the site based on db string.
-        # quote_plus(search_term)
-        # urllib.urlencode({'q':searchfor})
-        # try urlencode pname.
-        #pname = utils.web.urlencode(pname)
+
+        # sanitize.
+        pname = self._sanitizeName(pname)
+
+        # need our api key.
+        bingapikey = self.registryValue('bingAPIkey')
+        if not bingapikey or bingapikey == '':
+            self.log.info("You need an API key for bing to be set. Set it and reload the plugin.")
+            return None
+
         # db.
-        if db == "e":  # espn.
-            burl = "%s site:espn.go.com/mlb/player/" % pname
-        elif db == "r":  # rworld.
-            burl = "%s site:www.rotoworld.com/player/mlb/" % pname
-        elif db == "s":  # st.
-            burl = "%s site:www.spotrac.com/mlb/" % pname
-        elif db == "br":  # br.
-            burl = "%s site:www.baseball-reference.com/minors/" % pname
+        if db == "e": # espn.
+            burl = "site:espn.go.com/mlb/player/ %s" % pname
+        elif db == "r": # rworld.
+            burl = "site:www.rotoworld.com/player/mlb/ %s" % pname
+        elif db == "s": # st.
+            burl = "site:www.spotrac.com/mlb/ %s" % pname
+        elif db == "br": # br.
+            burl = "site:www.baseball-reference.com/minors/ %s" % pname
+        # urlencode.
+        burl = quote_plus("'" + burl + "'")
+
         # construct url (properly escaped)
-        url = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=8&q=%s" % burl.replace(' ', '%20')
-        # now fetch url.
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
+        url = "https://api.datamarket.azure.com/Bing/SearchWeb/v1/Web?Query=%s&$top=20&$format=json" % (burl)
+        # fetch.
+        try:
+            r = requests.get(url, auth=(bingapikey, bingapikey))
+            rjson = r.json()
+            rjson = rjson['d']['results'][0]['Url']
+            return rjson
+        except Exception as e:
+            print "ERROR:: _pf :: {0}".format(e)
             return None
-        # load the json.
-        jsonf = json.loads(html)
-        # make sure status is 200.
-        if jsonf['responseStatus'] != 200:
-            return None
-        # make sure we have results.
-        results = jsonf['responseData']['results']
-        if len(results) == 0:
-            return None
-        # finally, return the first url.
-        url = results[0]['url']
-        # lets manually urlquote BR.
-        if db == "br":
-            url = url.replace('%3F', '?').replace('%3D', '=')
-        return url
-    
+
+
     def _so(self, d):
-        """<dict> 
-        
+        """<dict>
+
         Input dict of stats. Order them properly.
         """
-        
+
         so = ['GP','AB','AVG','HR','RBI','SB','CS','R','H','2B','3B','OBP','SLG','OPS','BB','SO',
               'IP','W','L','SV','ERA','WHIP','BB','SO','H','HR','HLD','BLSV','R','CG','SHO','WAR']
         # one liner is always better.
@@ -2126,7 +2122,7 @@ class MLB(callbacks.Plugin):
 
     def milbplayerseason(self, irc, msg, args, optyear, optplayer):
         """<YYYY> <player name>
-        
+
         Display season stats, for season (YYYY), by player.
         Ex: 2010 Mike Trout
         """
@@ -2196,7 +2192,7 @@ class MLB(callbacks.Plugin):
 
     def milbplayerinfo(self, irc, msg, args, optplayer):
         """<player name>
-        
+
         Display minor league information about player.
         Ex: Mike Trout
         """
@@ -2214,7 +2210,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'itemtype':'http://data-vocabulary.org/Person'}) 
+        div = soup.find('div', attrs={'itemtype':'http://data-vocabulary.org/Person'})
         if not div:
             irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
             return
@@ -2235,14 +2231,14 @@ class MLB(callbacks.Plugin):
         irc.reply("{0} :: {1}".format(self._bold(pn), t))
 
     milbplayerinfo = wrap(milbplayerinfo, [('text')])
-    
+
     def mlbplayercontract(self, irc, msg, args, optplayer):
         """<player name>
-    
+
         Display known contract details for active player.
         Ex: Derek Jeter.
         """
-    
+
         # try and grab a player.
         url = self._pf('r', optplayer)
         if not url:
@@ -2281,14 +2277,14 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} :: I'm sorry but no contract details are listed on: {1}".format(self._bold(plrname), url))
 
     mlbplayercontract = wrap(mlbplayercontract, [('text')])
-    
+
     def mlbplayernews(self, irc, msg, args, optplayer):
         """<player name>
-    
+
         Display latest news for player via Rotoworld.
         Ex: Derek Jeter.
         """
-    
+
         # try and grab a player.
         url = self._pf('r', optplayer)
         if not url:
@@ -2326,16 +2322,16 @@ class MLB(callbacks.Plugin):
         playerNews = TAG_RE.sub('', playerNews)
         # output.
         irc.reply("{0} :: {1}".format(self._bold(plrname), playerNews))
-    
+
     mlbplayernews = wrap(mlbplayernews, [('text')])
-    
+
     def mlbcareerstats(self, irc, msg, args, optplayer):
         """<player name>
-    
+
         Display career totals and season averages for player.
         Ex: Don Mattingly or Rickey Henderson or Derek Jeter.
         """
-    
+
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2377,16 +2373,16 @@ class MLB(callbacks.Plugin):
         # output time.
         irc.reply("{0} :: Season Averages :: {1}".format(self._bold(plrname), " | ".join([i for i in seasonavg])))
         irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
-    
+
     mlbcareerstats = wrap(mlbcareerstats, [('text')])
-    
+
     def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
         """<year> <player name>
-    
+
         Fetch season stats for player.
         Ex: 2010 Derek Jeter
         """
-    
+
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2449,16 +2445,16 @@ class MLB(callbacks.Plugin):
             outstr.extend(t)  # must extend (not append) list
         # finally, output
         irc.reply("{0} :: {1} Stats :: {2}".format(self._bold(plrname), optyear, " ".join(outstr)))
-    
+
     mlbseasonstats = wrap(mlbseasonstats, [('int'), ('text')])
-    
+
     def mlbplayerinfo(self, irc, msg, args, optplayer):
         """<player name>
-    
+
         Display information about MLB player.
         Ex: Derek Jeter
         """
-    
+
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2485,23 +2481,23 @@ class MLB(callbacks.Plugin):
         pname = div.find('h1')
         if not pname:
             irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
-            return      
+            return
         pdiv = div.find('div', attrs={'class':'player-bio'})
         if not pdiv:
             irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
             return
         # now output.
         irc.reply("{0} :: {1}".format(self._bold(pname.getText().encode('utf-8')), pdiv.getText(separator=' ').encode('utf-8')))
-    
+
     mlbplayerinfo = wrap(mlbplayerinfo, [('text')])
-    
+
     def mlbgamestats(self, irc, msg, args, optplayer):
         """<player name>
-    
+
         Fetch gamestats for player from current or past game.
         Ex: Derek Jeter
         """
-    
+
         # try and grab a player.
         url = self._pf('e', optplayer)
         if not url:
@@ -2544,7 +2540,7 @@ class MLB(callbacks.Plugin):
                 return
             #statline = [self._bold(prevcolhead[i+1].getText()) + ": " + x.getText() for (i, x) in enumerate(prevgame[1:])]
             statline = {prevcolhead[i+1].getText(): x.getText() for (i, x) in enumerate(prevgame[1:])}
-            statline = self._so(statline)       
+            statline = self._so(statline)
             irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
         elif "CURRENT GAME" in mtheader:
             gamedetails = maintable.find('div', attrs={'class':'game-details'})
@@ -2564,7 +2560,7 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
         else:
             irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
-    
+
     mlbgamestats = wrap(mlbgamestats, [('text')])
 
 Class = MLB

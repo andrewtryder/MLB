@@ -1,8 +1,5 @@
 ###
-# Copyright (c) 2012-2014, spline
-# All rights reserved.
-#
-#
+# see LICENSE.txt for information.
 ###
 
 import supybot.conf as conf
@@ -22,5 +19,6 @@ def configure(advanced):
 
 MLB = conf.registerPlugin('MLB')
 conf.registerGlobalValue(MLB, 'logURLs', registry.Boolean(True, """Should we log all URL calls?"""))
+conf.registerGlobalValue(MLB, 'bingAPIkey', registry.String('', """Bing API key.""", private=True))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:

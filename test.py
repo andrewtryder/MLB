@@ -1,8 +1,5 @@
 ###
-# Copyright (c) 2012-2014, spline
-# All rights reserved.
-#
-#
+# see LICENSE.txt for information.
 ###
 
 from supybot.test import *
@@ -26,6 +23,3 @@ class MLBTestCase(PluginTestCase):
         self.assertNotError('mlbawards 2013')
         self.assertNotError('mlbbox NYY')
         self.assertNotError('mlbcareerleaders batting batavg')
-
-
-# vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
