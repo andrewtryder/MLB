@@ -957,64 +957,6 @@ class MLB(callbacks.Plugin):
 
     mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
 
-    def mlbweather(self, irc, msg, args, optteam):
-        """<team>
-        Display weather for MLB team at park they are playing at.
-        Ex: NYY
-        """
-
-        # test for valid teams.
-        optteam = self._validteams(optteam)
-        if not optteam:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # build and fetch url.
-        url = self._b64decode('aHR0cDovL3d3dy5wYXJrZmFjdG9ycy5jb20v')
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # sanity checking.
-        if "an error occurred while processing this directive" in html:
-            irc.reply("Something broke with parkfactors. Check back later.")
-            return
-        # need to do some mangling.
-        html = html.replace('&amp;','&').replace('ARZ','ARI').replace('CHW','CWS').replace('WAS','WSH').replace('MLW','MIL')
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        h3s = soup.findAll('h3')
-        # k/v container for output. key = team.
-        mlbweather = collections.defaultdict(list)
-        # each h3 is a game.
-        for h3 in h3s:  # the html/formatting sucks.
-            park = h3.find('span', attrs={'style':'float: left;'})
-            factor = h3.find('span', attrs={'style': re.compile('color:.*?')})
-            matchup = h3.findNext('h4').find('span', attrs={'style':'float: left;'})
-            winddir = h3.findNext('img', attrs={'class':'rose'})
-            winddir = (''.join(i for i in winddir['src'] if i.isdigit())).encode('utf-8')
-            windspeed = h3.findNext('p', attrs={'class':'windspeed'}).find('span').getText().encode('utf-8')
-            weather = h3.findNext('h5', attrs={'class':'l'})  #
-            if weather.find('img', attrs={'src':'../images/roof.gif'}):
-                weather = "[ROOF] " + weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
-            else:
-                weather = weather.getText().strip().replace('.Later','. Later').replace('&deg;F','F ')
-
-            # now do some split work to get the dict with teams as keys.
-            teams = matchup.getText().split(',', 1)  # NYY at DET, 1:05PM ET
-            # now, left with TEAM at TEAM. foreach on both to append to dict.
-            for team in teams[0].split('at'):  # ugly but works.
-                mlbweather[team.strip()] = "{0}  at {1}({2})  Weather: {3}  Wind: {4}mph  ({5}deg)".format(\
-                    self._ul(matchup.getText().encode('utf-8')), park.getText().encode('utf-8'),\
-                        factor.getText().encode('utf-8'), weather.encode('utf-8'), windspeed, winddir)
-        # finally, lets try and output.
-        output = mlbweather.get(optteam)
-        if output:  # team not found.
-            irc.reply(output)
-        else:  # team not found.
-            irc.reply("ERROR: No weather found for: {0}. Perhaps the team is not playing?".format(optteam))
-
-    mlbweather = wrap(mlbweather, [('somethingWithoutSpaces')])
-
     def mlbvaluations(self, irc, msg, args):
         """
         Display current MLB team valuations from Forbes.
