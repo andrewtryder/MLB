@@ -316,7 +316,7 @@ class MLB(callbacks.Plugin):
         teamdict = collections.defaultdict()
         # process each "game" (two teams in each)
         for game in games:
-            teams = game.findAll('p', attrs={'class':'team-name'})
+            teams = game.findAll('p', attrs={'class': 'team-name'})
             for team in teams:  # each game has two teams.
                 tt = team.find('a')
                 if tt:
@@ -350,7 +350,7 @@ class MLB(callbacks.Plugin):
             # ok we did find umpires. lets grab the nexttd.
             umptd = umps.findNext('td').getText().encode('utf-8')
             # lets also grab the game info. crude but it works.
-            gameinfo = soup.find('div', attrs={'id':re.compile('matchup-mlb-.*')}).getText(separator=' ').encode('utf-8')
+            gameinfo = soup.find('div', attrs={'id': re.compile('matchup-mlb-.*')}).getText(separator=' ').encode('utf-8')
             # now output.
             irc.reply("{0} :: {1}".format(gameinfo, umptd))
 
@@ -495,7 +495,7 @@ class MLB(callbacks.Plugin):
         teamdict = {}
         # process each "game" (two teams in each)
         for game in games:
-            teams = game.findAll('p', attrs={'class':'team-name'})
+            teams = game.findAll('p', attrs={'class': 'team-name'})
             for team in teams:  # each game has two teams.
                 tt = team.find('a')
                 if tt:
@@ -503,19 +503,19 @@ class MLB(callbacks.Plugin):
                     teamname = ahref.split('/')[7].lower()  # will be lowercase.
                     teamname = self._translateTeam('team', 'eshort', teamname)  # fix the bspn discrepancy.
                     # now lets grab the rest. first, the status.
-                    gmstatus = game.find('div', attrs={'class':'game-status'})
+                    gmstatus = game.find('div', attrs={'class': 'game-status'})
                     tempd = {}  # lets also make a temp dict.
                     tempd["status"] = gmstatus.getText()   # add in the text.
                     two = ['away', 'home']  # iterate through these two.
                     for one in two:  # iterate over these two.
-                        finddiv = game.find('div', attrs={'class':'team ' + one})  # use slice.
-                        findteam = finddiv.find('p', attrs={'class':'team-name'})  # name of team.
-                        findrec = finddiv.find('p', attrs={'class':'record'})  # name of team.
+                        finddiv = game.find('div', attrs={'class': 'team ' + one})  # use slice.
+                        findteam = finddiv.find('p', attrs={'class': 'team-name'})  # name of team.
+                        findrec = finddiv.find('p', attrs={'class': 'record'})  # name of team.
                         # box score part.
-                        findscore = finddiv.find('ul', attrs={'class':'score'})
-                        findruns = findscore.find('li', attrs={'id':re.compile('.*?T$')})
-                        findhits = findscore.find('li', attrs={'id':re.compile('.*?H$')})
-                        finderrors = findscore.find('li', attrs={'id':re.compile('.*?E$')})
+                        findscore = finddiv.find('ul', attrs={'class': 'score'})
+                        findruns = findscore.find('li', attrs={'id': re.compile('.*?T$')})
+                        findhits = findscore.find('li', attrs={'id': re.compile('.*?H$')})
+                        finderrors = findscore.find('li', attrs={'id': re.compile('.*?E$')})
                         # now lets inject some of this into our temp dict, which winds up in the main.
                         tempd[one + "team"] = findteam.getText()
                         tempd[one + "record"] = findrec.getText()
@@ -641,7 +641,7 @@ class MLB(callbacks.Plugin):
         cyyoung = collections.defaultdict(list)
         # process each row(player).
         for player in players:
-            colhead = player.findPrevious('tr', attrs={'class':'stathead'})
+            colhead = player.findPrevious('tr', attrs={'class': 'stathead'})
             tds = [item.getText() for item in player.findAll('td')]
             appendString = "{0}. {1}".format(tds[0], tds[1], tds[2])
             cyyoung[str(colhead.getText())].append(appendString)  # now append.
@@ -650,64 +650,6 @@ class MLB(callbacks.Plugin):
             irc.reply("{0} :: {1}".format(self._red(i), " | ".join([item for item in x])))
 
     mlbcyyoung = wrap(mlbcyyoung)
-
-    def mlbseries(self, irc, msg, args, optteam, optopp):
-        """<team> <opp>
-        Display the remaining games between TEAM and OPP in the current schedule.
-        Ex: NYY TOR
-        """
-
-        # test for valid teams.
-        optteam = self._validteams(optteam)
-        if not optteam:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # test for valid teams.
-        optopp = self._validteams(optopp)
-        if not optopp:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # fetch url.
-        teamString = self._translateTeam('cbs', 'team', optteam)  # need cbs string for team. must be uppercase.
-        url = self._b64decode('aHR0cDovL3d3dy5jYnNzcG9ydHMuY29tL21sYi90ZWFtcy9zY2hlZHVsZQ==') + '/%s/' % teamString.upper()
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # http://www.cbssports.com/mlb/teams/schedule/NYY/
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.findAll('table', attrs={'class':'data'})[1]
-        rows = table.findAll('tr', attrs={'class': re.compile('^row.*?')})
-        # container for output.
-        winloss = []
-        for row in rows:  # one per game.
-            tds = row.findAll('td')
-            oppteam = tds[1].find('a')['href'].split('/')[4]  # find opp in / / href.
-            oppteam = self._translateTeam('team', 'cbs', oppteam.lower())  # translate to mate with optteam. must be lower.
-            if optopp == oppteam:  # match input opp to what we found.
-                date = tds[0].getText().replace('  ', ' ').strip()  # trans date.
-                if tds[1].getText().startswith('@'):  # vs or @ team.
-                    vsorat = "@"
-                else:
-                    vsorat = "vs."
-                score = tds[2].getText().replace('  ', ' ').strip()  # score here, remove doublespace.
-                # if Lost, Won or Post found, game was played. Skip over those.
-                if score.startswith('Lost') or score.startswith('Won') or score.startswith('Post'):
-                    continue
-                else:  # actually add to the list.
-                    winloss.append("{0} {1} {2} {3}".format(date, score, vsorat, optopp))
-        # now prepare to output.
-        if len(winloss) > 0:  # we found remaining games.
-            descstring = " | ".join([item for item in winloss])
-            irc.reply("There are {0} games remaining between {1} and {2} :: {3}".format(self._red(len(winloss)),\
-                self._bold(optteam), self._bold(optopp), descstring))
-        else:  # no remaining games found.
-            irc.reply("I do not see any remaining games between: {0} and {1} in the {2} schedule.".format(\
-                self._bold(optteam), self._bold(optopp), datetime.date.today().year))
-
-    mlbseries = wrap(mlbseries, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbejections(self, irc, msg, args):
         """
