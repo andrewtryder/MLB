@@ -1631,14 +1631,14 @@ class MLB(callbacks.Plugin):
         # output time. conditional if we're showing details or not.
         if details:  # show each injury with details.
             irc.reply("{0} :: {1} Injuries".format(self._red(optteam), len(object_list)))
-            irc.reply("{0:27} {1:9} {2:<10} {3:<15} {4:<15}".format("NAME","STATUS","DATE","INJURY","RETURNS"))
+            irc.reply("{0:27} {1:9} {2:<10} {3:<15} {4:<15}".format("NAME", "STATUS", "DATE", "INJURY", "RETURNS"))
             for inj in object_list:  # one per line since we are detailed.
                 irc.reply("{0:<27} {1:<9} {2:<10} {3:<15} {4:<15}".format(inj['name'], inj['status'], inj['date'], inj['injury'], inj['returns']))
         else:  # no detail.
             irc.reply("{0} :: {1} Injuries".format(self._red(optteam), len(object_list)))
             irc.reply(" | ".join([item['name'] + " (" + item['returns'] + ")" for item in object_list]))
 
-    mlbinjury = wrap(mlbinjury, [getopts({'details':''}), ('somethingWithoutSpaces')])
+    mlbinjury = wrap(mlbinjury, [getopts({'details': ''}), ('somethingWithoutSpaces')])
 
     def mlbpowerrankings(self, irc, msg, args):
         """
@@ -1654,22 +1654,22 @@ class MLB(callbacks.Plugin):
             return
         # process HTML
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        if not soup.find('table', attrs={'class':'tablehead'}):
+        if not soup.find('table', attrs={'class': 'tablehead'}):
             irc.reply("Something broke heavily formatting on powerrankings page.")
             return
         # go about regular html business.
-        table = soup.find('table', attrs={'class':'tablehead'})
-        headline = table.find('tr', attrs={'class':'stathead'})
-        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow|^evenrow')})
+        table = soup.find('table', attrs={'class': 'tablehead'})
+        headline = table.find('tr', attrs={'class': 'stathead'})
+        rows = table.findAll('tr', attrs={'class': re.compile('^oddrow|^evenrow')})
         # list for each team.
         powerrankings = []
         # each row is a team.
-        for row in rows: # one row per team.
-            tds = row.findAll('td') # findall tds.
-            rank = tds[0].getText() # rank number.
-            team = tds[1].find('div', attrs={'style':'padding:10px 0;'}).find('a').getText() # finds short.
-            lastweek = tds[2].find('span', attrs={'class':'pr-last'}).getText()
-            lastweek = lastweek.replace('Last Week:', '').strip() # rank #
+        for row in rows:  # one row per team.
+            tds = row.findAll('td')  # findall tds.
+            rank = tds[0].getText()  # rank number.
+            team = tds[1].find('div', attrs={'style': 'padding:10px 0;'}).find('a').getText()  # finds short.
+            lastweek = tds[2].find('span', attrs={'class': 'pr-last'}).getText()
+            lastweek = lastweek.replace('Last Week:', '').strip()  # rank #
             # now add the rows to our data structures.
             powerrankings.append("{0}. {1} (prev: {2})".format(rank, team, lastweek))
         # now output.
@@ -1689,11 +1689,11 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
         # now test out for valid category.
-        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'r':'runs', 'ab':'atBats', 'obp':'onBasePct',
-                    'slug':'slugAvg', 'ops':'OPS', 'sb':'stolenBases', 'runscreated':'runsCreated',
+        category = {'avg': 'avg', 'hr': 'homeRuns', 'rbi': 'RBIs', 'r': 'runs', 'ab': 'atBats', 'obp': 'onBasePct',
+                    'slug': 'slugAvg', 'ops': 'OPS', 'sb': 'stolenBases', 'runscreated': 'runsCreated',
                     'w': 'wins', 'l': 'losses', 'win%': 'winPct', 'era': 'ERA',  'k': 'strikeouts',
                     'k/9ip': 'strikeoutsPerNineInnings', 'holds': 'holds', 's': 'saves',
-                    'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP' }
+                    'gp': 'gamesPlayed', 'cg': 'completeGames', 'qs': 'qualityStarts', 'whip': 'WHIP'}
         optcategory = optcategory.lower()
         if optcategory not in category:
             irc.reply("ERROR: Category must be one of: {0}".format(" | ".join(sorted(category.keys()))))
@@ -1708,7 +1708,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'class':'table'})
+        table = soup.find('table', attrs={'class': 'table'})
         rows = table.findAll('tr')[1:6]  # top 5 only.
         # list for output.
         object_list = []
@@ -1722,7 +1722,7 @@ class MLB(callbacks.Plugin):
 
     mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
-    def mlbteamleaders(self, irc, msg, args, optleague, optcategory):
+    def mlbleagueleaders(self, irc, msg, args, optleague, optcategory):
         """<MLB|AL|NL> <category>
         Display top 10 teams in category for a specific stat.
         Categories: hr, avg, rbi, ra, sb, era, whip, k
@@ -1730,8 +1730,8 @@ class MLB(callbacks.Plugin):
         """
 
         # establish valid leagues and valid categories.
-        league = {'mlb': '9', 'al':'7', 'nl':'8'}  # do our own translation here for league/category.
-        category = {'avg':'avg', 'hr':'homeRuns', 'rbi':'RBIs', 'ra':'runs', 'sb':'stolenBases', 'era':'ERA', 'whip':'whip', 'k':'strikeoutsPerNineInnings'}
+        league = {'mlb': '9', 'al': '7', 'nl': '8'}  # do our own translation here for league/category.
+        category = {'avg': 'avg', 'hr': 'homeRuns', 'rbi': 'RBIs', 'ra': 'runs', 'sb': 'stolenBases', 'era': 'ERA', 'whip': 'whip', 'k': 'strikeoutsPerNineInnings'}
         # check if we have valid league/category.
         optleague, optcategory = optleague.lower(), optcategory.lower()
         if optleague not in league:  # invalid league.
@@ -1750,7 +1750,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'class':'table'})
+        table = soup.find('table', attrs={'class': 'table'})
         rows = table.findAll('tr')
         # list for output.
         append_list = []
@@ -1765,7 +1765,7 @@ class MLB(callbacks.Plugin):
         thelist = " | ".join([item for item in append_list])
         irc.reply("Leaders in {0} for {1} :: {2}".format(self._red(optleague.upper()), self._bold(optcategory.upper()), thelist))
 
-    mlbteamleaders = wrap(mlbteamleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    mlbleagueleaders = wrap(mlbleagueleaders, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbteamtrans(self, irc, msg, args, optteam):
         """<team>
@@ -1788,7 +1788,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        t1 = soup.findAll('div', attrs={'class':re.compile('ind|ind tL|ind alt')})
+        t1 = soup.findAll('div', attrs={'class': re.compile('ind|ind tL|ind alt')})
         # sanity check.
         if len(t1) < 1:
             irc.reply("ERROR: No transactions found for: {0}".format(optteam))
@@ -1830,7 +1830,7 @@ class MLB(callbacks.Plugin):
             return
         # if we do have transactions, process HTML.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        t1 = soup.findAll('div', attrs={'class':re.compile('ind alt|ind')})
+        t1 = soup.findAll('div', attrs={'class': re.compile('ind alt|ind')})
 
         if len(t1) < 1:  # nothing found.
             irc.reply("ERROR: I did not find any MLB transactions for: {0}".format(optdate))
@@ -1876,24 +1876,28 @@ class MLB(callbacks.Plugin):
             if "No Games Scheduled" in html:
                 next
             # have to mangle these because of horrid abbreviations.
-            html = html.replace('WAS','WSH').replace('CHW','CWS').replace('KAN','KC').replace('TAM','TB').replace('SFO','SF').replace('SDG','SD')
+            html = html.replace('WAS', 'WSH').replace('CHW', 'CWS').replace('KAN', 'KC').replace('TAM', 'TB').replace('SFO', 'SF').replace('SDG', 'SD')
             # process html.
             soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-            rows = soup.findAll('div', attrs={'class':re.compile('ind alt tL spaced|ind tL spaced')})
+            rows = soup.findAll('div', attrs={'class': re.compile('ind alt tL spaced|ind tL spaced')})
             # each row is a game that day.
             for row in rows:  # we grab the matchup (text) to match. the rest goes into a dict.
                 textmatch = re.search(r'<a class="bold inline".*?<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)<br />(.*?)<a class="inline".*?=">(.*?)</a>(.*?)$', row.renderContents(), re.I|re.S|re.M)
                 if textmatch:  # only inject if we match
                     d = {}
-                    d['date'] = eachdate  #  text from above. use BS for matchup and regex for the rest.
+                    d['date'] = eachdate  # text from above. use BS for matchup and regex for the rest.
                     d['matchup'] = row.find('a', attrs={'class': 'bold inline'}).getText().strip()
-                    d['vteam'] = textmatch.group(1).strip().replace(':','')
+                    d['vteam'] = textmatch.group(1).strip().replace(':', '')
                     d['vpitcher'] = textmatch.group(2).strip()
                     d['vpstats'] = textmatch.group(3).strip()
-                    d['hteam'] = textmatch.group(4).strip().replace(':','')
+                    d['hteam'] = textmatch.group(4).strip().replace(':', '')
                     d['hpitcher'] = textmatch.group(5).strip()
                     d['hpstats'] = textmatch.group(6).strip()
                     probables.append(d)  # order preserved via list. we add the dict.
+        # check to see if we have anything?
+        if len(probables) == 0:
+            irc.reply("Sorry, I have no probables for {0}".format(optteam))
+            return
         # now lets output.
         for eachentry in probables:  # iterate through list and only output when team is matched.
             if optteam in eachentry['matchup']:  # if optteam is contained in matchup, we output.
