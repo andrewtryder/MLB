@@ -1390,7 +1390,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        rows = soup.findAll('tr', attrs={'class':re.compile('oddrow|evenrow')})
+        rows = soup.findAll('tr', attrs={'class': re.compile('oddrow|evenrow')})
         # output container. key = team, value = manager.
         managers = collections.defaultdict(list)
         # each row is a manager.
@@ -1432,7 +1432,7 @@ class MLB(callbacks.Plugin):
             if option == 'wl':
                 wl = True
         # now check optdiv for the division.
-        optdiv = optdiv.upper() # upper to match keys. values are in the table to match with the html.
+        optdiv = optdiv.upper()  # upper to match keys. values are in the table to match with the html.
         leaguetable =   {'ALE': 'American League EAST',
                          'ALC': 'American League CENTRAL',
                          'ALW': 'American League WEST',
@@ -1462,34 +1462,34 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8') # one of these below will break if formatting changes.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')  # one of these below will break if formatting changes.
         stitle = soup.find('title')  # dirty check for spring training.
         if stitle and 'Spring Training' in stitle.text:  # we found it.
             irc.reply("ERROR: I don't do standings during Spring Training. Check back in the regular season.")
             return
-        div = soup.find('div', attrs={'class':'mod-container mod-table mod-no-header'}) # div has all
-        table = div.find('table', attrs={'class':'tablehead'}) # table in there
-        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow.*?|^evenrow.*?')}) # rows are each team
+        div = soup.find('div', attrs={'class': 'mod-container mod-table mod-no-header'})  # div has all
+        table = div.find('table', attrs={'class': 'tablehead'}) # table in there
+        rows = table.findAll('tr', attrs={'class': re.compile('^oddrow.*?|^evenrow.*?')})  # rows are each team
         # list to hold our defaultdicts.
         object_list = []
         lengthlist = collections.defaultdict(list)  # sep data structure to determine length.
         # each row is something in the standings.
         for row in rows:
-            league = row.findPrevious('tr', attrs={'class':'stathead'})
-            header = row.findPrevious('tr', attrs={'class':'colhead'}).findAll('td')
+            league = row.findPrevious('tr', attrs={'class': 'stathead'})
+            header = row.findPrevious('tr', attrs={'class': 'colhead'}).findAll('td')
             tds = row.findAll('td')
             # we shove each row (team) into an OD.
             d = collections.OrderedDict()
             division = "{0} {1}".format(league.getText(), header[0].getText())
             # only inject what we need
-            if division == leaguetable[optdiv]: # from table above. only match what we need.
+            if division == leaguetable[optdiv]:  # from table above. only match what we need.
                 for i, td in enumerate(tds):
-                    if i == 0: # manual replace of team here because the column doesn't say team.
+                    if i == 0:  # manual replace of team here because the column doesn't say team.
                         d['TEAM'] = tds[0].getText()
                         lengthlist['TEAM'].append(len(tds[0].getText()))
                     else:
-                        d[header[i].getText()] = td.getText().replace('  ',' ') # add to ordereddict + conv multispace to one.
-                        lengthlist[header[i].getText()].append(len(td.getText())) # add key based on header, length of string.
+                        d[header[i].getText()] = td.getText().replace('  ',' ')  # add to ordereddict + conv multispace to one.
+                        lengthlist[header[i].getText()].append(len(td.getText()))  # add key based on header, length of string.
                 object_list.append(d)  # append OD to list.
         # partial sanity check but more of a cheap copy because of how we output.
         if len(object_list) > 0:
@@ -1502,8 +1502,7 @@ class MLB(callbacks.Plugin):
             wcstandings = []  # list for output.
             for i, each in enumerate(object_list[1:7]):  # only display 1-5.
                 if wl:  # if we should display win-loss.
-                   wcstandings.append("#{0} {1} ({2}-{3}) {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB']))
-                   #wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
+                    wcstandings.append("#{0} {1} ({2}-{3}) {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB']))
                 else:  # regular, no w-l
                     wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
             irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(wcstandings)))
@@ -1526,12 +1525,12 @@ class MLB(callbacks.Plugin):
                         tableRow = ""  # empty string we += to with each "row".
                         for inum, k in enumerate(each.keys()):
                             if inum == 0:  # team here, which we want to bold.
-                                tableRow += "{0:{1}}".format(self._bold(each[k]),max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
+                                tableRow += "{0:{1}}".format(self._bold(each[k]), max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
                             else:  # rest of the elements outside the team.
-                                tableRow += "{0:{1}}".format(each[k],max(lengthlist[k])+2, key=int)
+                                tableRow += "{0:{1}}".format(each[k], max(lengthlist[k])+2, key=int)
                         irc.reply(tableRow)  # output.
 
-    mlbstandings = wrap(mlbstandings, [getopts({'wl':'', 'full':'', 'expanded':'', 'vsdivision':''}), ('somethingWithoutSpaces')])
+    mlbstandings = wrap(mlbstandings, [getopts({'wl': '', 'full': '', 'expanded': '', 'vsdivision': ''}), ('somethingWithoutSpaces')])
 
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
@@ -1557,13 +1556,17 @@ class MLB(callbacks.Plugin):
             return
         # process html. this is kinda icky.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'class':'team-lineup highlight'})
+        div = soup.find('div', attrs={'class': 'team-lineup highlight'})
+        # test if we have a game?
+        if "No game" in div.getText():
+            irc.reply("Sorry, I don't have a game for today.")
+            return
         divs = div.findAll('div')
         # 20140330 - had to fix this again.
         gmdate = divs[1].getText()  # date of game.
         seconddiv = divs[3]   # opp pitcher.
         otherpitcher = seconddiv.getText()  # opp pitcher and team.
-        lineup = div.find('div', attrs={'class':'game-lineup'})
+        lineup = div.find('div', attrs={'class': 'game-lineup'})
         # sanity check.
         if "No lineup yet" in lineup.getText():
             irc.reply("Sorry, I don't have a lineup yet for: {0}".format(gmdate))
