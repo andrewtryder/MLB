@@ -142,14 +142,6 @@ class MLB(callbacks.Plugin):
             output = instring
         return output
 
-    def _millify(self, num):
-        """Turns a number like 1,000,000 into 1M."""
-
-        for unit in ['', 'k', 'M', 'B', 'T']:
-            if num < 1000.0:
-                return "%3.3f%s" % (num, unit)
-            num /= 1000.0
-
     ######################
     # DATABASE FUNCTIONS #
     ######################
@@ -719,7 +711,7 @@ class MLB(callbacks.Plugin):
         # process html.
         #soup = BeautifulSoup(html)
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        ars = soup.findAll('h2', attrs={'class':'blog-title'})
+        ars = soup.findAll('h2', attrs={'class': 'blog-title'})
         if len(ars) == 0:
             irc.reply("No arrests found. Something break?")
             return
@@ -727,11 +719,11 @@ class MLB(callbacks.Plugin):
             az = []  # empty list for arrests.
             # iterate over each and inject to list.
             for ar in ars[0:5]:  # iterate over each.
-                ard = ar.findNext('div', attrs={'class':'blog-date'})
+                ard = ar.findNext('div', attrs={'class': 'blog-date'})
                 # text and cleanup.
                 ard = ard.getText().replace('Posted On', '')
                 # print.
-                az.append({'d':ard, 'a':ar.getText()})
+                az.append({'d': ard, 'a': ar.getText()})
         # now lets create our output.
         delta = datetime.datetime.strptime(str(az[0]['d']), "%B %d, %Y").date() - datetime.date.today()
         daysSince = abs(delta.days)
@@ -740,7 +732,7 @@ class MLB(callbacks.Plugin):
 
     mlbarrests = wrap(mlbarrests)
 
-    def mlbgamesbypos (self, irc, msg, args, optteam):
+    def mlbgamesbypos(self, irc, msg, args, optteam):
         """<team>
         Display a team's games by position.
         Ex: NYY
@@ -760,8 +752,8 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('td', attrs={'colspan':'2'}, text="GAMES BY POSITION").findParent('table')
-        rows = table.findAll('tr', attrs={'class':re.compile('oddrow|evenrow')})
+        table = soup.find('td', attrs={'colspan': '2'}, text="GAMES BY POSITION").findParent('table')
+        rows = table.findAll('tr', attrs={'class': re.compile('oddrow|evenrow')})
         # output list.
         append_list = []
         # each row is a position.
@@ -809,13 +801,13 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('div', attrs={'class':'mod-content'}).find('table', attrs={'class':'tablehead'})
-        rows = table.findAll('tr', attrs={'class':re.compile('^oddrow player.*|^evenrow player.*')})
+        table = soup.find('div', attrs={'class': 'mod-content'}).find('table', attrs={'class':'tablehead'})
+        rows = table.findAll('tr', attrs={'class': re.compile('^oddrow player.*|^evenrow player.*')})
         # k/v container for output.
         team_data = collections.defaultdict(list)
         # each row is a player, in a table of position.
         for row in rows:
-            playerType = row.findPrevious('tr', attrs={'class':'stathead'})
+            playerType = row.findPrevious('tr', attrs={'class': 'stathead'})
             playerNum = row.find('td')
             playerName = playerNum.findNext('td').find('a')
             playerPos = playerName.findNext('td')
@@ -824,7 +816,7 @@ class MLB(callbacks.Plugin):
         for i, j in team_data.iteritems():  # output one line per position.
             irc.reply("{0} {1} :: {2}".format(self._red(optteam.upper()), self._bold(i), " | ".join([item for item in j])))
 
-    mlbroster = wrap(mlbroster, [getopts({'active':'','40man':''}), ('somethingWithoutSpaces')])
+    mlbroster = wrap(mlbroster, [getopts({'active': '', '40man': ''}), ('somethingWithoutSpaces')])
 
     def mlbrosterstats(self, irc, msg, args, optteam):
         """[team]
@@ -847,7 +839,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'class':'tablehead'})
+        table = soup.find('table', attrs={'class': 'tablehead'})
         rows = table.findAll('tr')[2:]  # first two are headers.
         # use a list to store our ordereddicts.
         object_list = []
@@ -888,25 +880,39 @@ class MLB(callbacks.Plugin):
 
     mlbrosterstats = wrap(mlbrosterstats, [optional('somethingWithoutSpaces')])
 
-    def _format_cap(self, figure):
-        """Format cap numbers for mlbpayroll command."""
+    def _hs(self, s):
+        """
+        format a size in bytes into a 'human' size.
+        """
 
-        figure = figure.replace(',', '').strip()  # remove commas.
-        if figure.startswith('-'):  # figure out if we're a negative number.
-            negative = True
-            figure = figure.replace('-','')
-        else:
-            negative = False
-        # try and millify.
-        try:
-            figure = self._millify(float(figure))
-        except:  # sometimes it breaks.
-            figure = figure
-        # reconstruct number below.
-        if negative:
-            figure = "-" + figure
-        # now return
-        return figure
+        try:  # to be safe, wrap in a giant try/except block.
+            s = s.replace(',', '').replace('$', '').strip()  # remove $ and ,
+            # are we negative?
+            if s.startswith('-'):
+                negative = True
+                s = s.replace('-','')
+            else: # not
+                negative = False
+            # main routine.
+            suffixes_table = [('',0),('k',0),('M',1),('B',2),('T',2), ('Z',2)]
+            num = float(s)
+            for suffix, precision in suffixes_table:
+                if num < 1000.0:
+                    break
+                num /= 1000.0
+            # precision.
+            if precision == 0:
+                formatted_size = "%d" % num
+            else:
+                formatted_size = str(round(num, ndigits=precision))
+            # should we reattach - (neg num)?
+            if negative:
+                formatted_size = "-" + formatted_size
+            # now return.
+            return "%s%s" % (formatted_size, suffix)
+        except Exception, e:
+            self.log.info("_hs: ERROR trying to format: {0} :: {1}".format(s, e))
+            return s
 
     def mlbpayroll(self, irc, msg, args, optteam):
         """<team>
@@ -930,22 +936,24 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        teamtitle = soup.find('title')
-        table = soup.find('table', attrs={'id':'teamTable'})
-        # we just use rows here. last 4 only.
-        rows = table.findAll('tr')[-4:]
-        # list for output.
-        payroll = []
-        # iterate over rows.
-        for row in rows[0:3]:  # first 3.
-            tds = row.findAll('td')
-            t = tds[0].getText()
-            figure = self._format_cap(tds[4].getText())
-            payroll.append("{0}: {1}".format(self._ul(t), figure))
-        # last one. just grab the "total" figure.
-        totalcap = self._format_cap(rows[3].find('span', attrs={'class':'cap total'}).getText())  # specific one.
+        teamtitle = soup.find('title').getText().split('|')[0].strip()
+        # we dont check this below because we want to know when it breaks.
+        table = soup.find('table', attrs={'class': 'datatable captotal xs-hide'})
+        #irc.reply("{0}".format(table.getText()))
+        # quick and dirt, grab the last row.
+        rows = table.findAll('tr')[-1:]
+        # this row will have 4 TD in them. First is blank, second is base salary, signing bonus, incentives, captotal.
+        basesalary = rows[0].findAll('td')[1].getText()
+        signingbonus = rows[0].findAll('td')[2].getText()
+        incentives = rows[0].findAll('td')[3].getText()
+        captotal = rows[0].findAll('td')[4].getText()
+        # format them.
+        basesalary = self._hs(basesalary)
+        signingbonus = self._hs(signingbonus)
+        incentives = self._hs(incentives)
+        captotal = self._hs(captotal)
         # output
-        irc.reply("{0} :: Total Cap: {1} :: {2}".format(self._bold(teamtitle.getText()), totalcap, " | ".join([item for item in payroll])))
+        irc.reply("{0} :: {1} | Base Salaries: {2} | Signing Bonuses: {3} | Incentives: {4}".format(self._bold(teamtitle), captotal, basesalary, signingbonus, incentives))
 
     mlbpayroll = wrap(mlbpayroll, [('somethingWithoutSpaces')])
 
