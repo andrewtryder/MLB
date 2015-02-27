@@ -971,14 +971,14 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        updated = soup.find('small', attrs={'class':'fright'}).getText()
-        tbody = soup.find('tbody', attrs={'id':'listbody'})
+        updated = soup.find('small', attrs={'class': 'fright'}).getText()
+        tbody = soup.find('tbody', attrs={'id': 'listbody'})
         rows = tbody.findAll('tr')
         # output list.
         object_list = []
         # one team per row.
         for row in rows:
-            rank = row.find('td', attrs={'class':'rank'})
+            rank = row.find('td', attrs={'class': 'rank'})
             team = rank.findNext('td')
             value = team.findNext('td')
             object_list.append("{0}. {1} {2}M".format(rank.getText(), team.find('h3').getText(), value.getText()))
@@ -1009,15 +1009,15 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        tables = soup.findAll('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1', 'width':'100%'})
+        tables = soup.findAll('table', attrs={'class': 'tablehead', 'cellpadding': '3', 'cellspacing': '1', 'width': '100%'})
         # dict for output. key = team name.
         new_data = collections.defaultdict(list)
         # each table is a matchup.
         for table in tables:
-            team = table.find('tr', attrs={'class':'colhead'}).find('td', attrs={'colspan':'6'})
-            gr = table.find('tr', attrs={'class':'oddrow'})
-            if team is not None and gr is not None: # horrible and cheap parse
-                team = self._translateTeam('team', 'fulltrans', team.getText().title()) # full to short.
+            team = table.find('tr', attrs={'class': 'colhead'}).find('td', attrs={'colspan': '6'})
+            gr = table.find('tr', attrs={'class': 'oddrow'})
+            if team is not None and gr is not None:  # horrible and cheap parse
+                team = self._translateTeam('team', 'fulltrans', team.getText().title())  # full to short.
                 new_data[team].append(gr.getText())
         # prepare to ouput
         output = new_data.get(optteam)
@@ -1039,24 +1039,24 @@ class MLB(callbacks.Plugin):
 
         # first, we declare our very long list of categories. used for validity/matching/url and the help.
         stats = {
-        'AVG':'avg',
-        'HR':'homeRuns',
-        'RBI':'RBIs',
-        'R':'runs',
-        'OBP':'onBasePct',
-        'SLUGGING':'slugAvg',
-        'OPS':'OPS',
-        'SB':'stolenBases',
-        'W':'wins',
-        'ERA':'ERA',
-        'SO':'strikeouts',
-        'S':'saves',
-        'WHIP':'WHIP'
+        'AVG': 'avg',
+        'HR': 'homeRuns',
+        'RBI': 'RBIs',
+        'R': 'runs',
+        'OBP': 'onBasePct',
+        'SLUGGING': 'slugAvg',
+        'OPS': 'OPS',
+        'SB': 'stolenBases',
+        'W': 'wins',
+        'ERA': 'ERA',
+        'SO': 'strikeouts',
+        'S': 'saves',
+        'WHIP': 'WHIP'
         }
         # handle league. check for valid.
         optleague = optleague.upper()  # upper to match.
         # validate the leagues.
-        validleagues = {'MLB':'9', 'NL':'8', 'AL':'7'}
+        validleagues = {'MLB': '9', 'NL': '8', 'AL': '7'}
         if optleague not in validleagues:  # invalid league found.
             irc.reply("ERROR: '{0}' is an invalid league. Must specify {1}".format(optleague, " | ".join(validleagues.keys())))
             return
@@ -1080,7 +1080,7 @@ class MLB(callbacks.Plugin):
             return
         # process HTML.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'class':'table', 'width':'100%', 'cellspacing':'0'})  # table class="table" width="100%" cellspacing="0"
+        table = soup.find('table', attrs={'class': 'table', 'width': '100%', 'cellspacing': '0'})  # table class="table" width="100%" cellspacing="0"
         trs = table.findAll('tr')[1:]  # skip the header row.
         # lets do a sanity check.
         if len(trs) == 0:
@@ -1098,7 +1098,7 @@ class MLB(callbacks.Plugin):
         # now we prepare the output.
         irc.reply("MLB LEADERS IN {0}({1}) :: {2}".format(self._ul(optstat), self._bold(optleague), " | ".join(mlbstats)))
 
-    mlbleaders = wrap(mlbleaders, [getopts({'postseason':'', 'bottom':''}), ('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    mlbleaders = wrap(mlbleaders, [getopts({'postseason': '', 'bottom': ''}), ('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def mlbplayoffs(self, irc, msg, args, optleague):
         """<AL|NL>
@@ -1123,7 +1123,7 @@ class MLB(callbacks.Plugin):
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         title = soup.findAll('h2')[1].getText()  # 2nd h2.
-        rows = soup.findAll('tr', attrs={'valign':'top', 'align':'center'})[2:7]  # skip the 2 headers, grab the first 5.
+        rows = soup.findAll('tr', attrs={'valign': 'top', 'align': 'center'})[2:7]  # skip the 2 headers, grab the first 5.
         # list container we put teams in to later grab.
         teams = []
         # rows filtered above. each row is a team. we only have five here.
@@ -1199,13 +1199,13 @@ class MLB(callbacks.Plugin):
         # parse html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         #soup = BeautifulSoup(html.replace('&nbsp;',' '))
-        table = soup.find('table', attrs={'data-crop':'50'})
+        table = soup.find('table', attrs={'data-crop': '50'})
         rows = table.findAll('tr')[1:11]  # skip first row (header) and get the next 10.
         # output container is a list.
         object_list = []
         # each row is a player.
         for row in rows:
-            rank = row.find('td', attrs={'align':'right'})
+            rank = row.find('td', attrs={'align': 'right'})
             player = rank.findNext('td')
             stat = player.findNext('td')
             if player.find('strong'):  # ul players are active.
@@ -1257,14 +1257,14 @@ class MLB(callbacks.Plugin):
             return
         # create our variables based on soup.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        alvp = soup.find('h2', text="AL MVP Voting").findNext('table', attrs={'id':'AL_MVP_voting'}).findNext('a').text
-        nlvp = soup.find('h2', text="NL MVP Voting").findNext('table', attrs={'id':'NL_MVP_voting'}).findNext('a').text
-        alcy = soup.find('h2', text="AL Cy Young Voting").findNext('table', attrs={'id':'AL_Cy_Young_voting'}).findNext('a').text
-        nlcy = soup.find('h2', text="NL Cy Young Voting").findNext('table', attrs={'id':'NL_Cy_Young_voting'}).findNext('a').text
-        alroy = soup.find('h2', text="AL Rookie of the Year Voting").findNext('table', attrs={'id':'AL_Rookie_of_the_Year_voting'}).findNext('a').text
-        nlroy = soup.find('h2', text="NL Rookie of the Year Voting").findNext('table', attrs={'id':'NL_Rookie_of_the_Year_voting'}).findNext('a').text
-        almgr = soup.find('h2', text="AL Mgr of the Year Voting").findNext('table', attrs={'id':'AL_Mgr_of_the_Year_voting'}).findNext('a').text
-        nlmgr = soup.find('h2', text="NL Mgr of the Year Voting").findNext('table', attrs={'id':'NL_Mgr_of_the_Year_voting'}).findNext('a').text
+        alvp = soup.find('h2', text="AL MVP Voting").findNext('table', attrs={'id': 'AL_MVP_voting'}).findNext('a').text
+        nlvp = soup.find('h2', text="NL MVP Voting").findNext('table', attrs={'id': 'NL_MVP_voting'}).findNext('a').text
+        alcy = soup.find('h2', text="AL Cy Young Voting").findNext('table', attrs={'id': 'AL_Cy_Young_voting'}).findNext('a').text
+        nlcy = soup.find('h2', text="NL Cy Young Voting").findNext('table', attrs={'id': 'NL_Cy_Young_voting'}).findNext('a').text
+        alroy = soup.find('h2', text="AL Rookie of the Year Voting").findNext('table', attrs={'id': 'AL_Rookie_of_the_Year_voting'}).findNext('a').text
+        nlroy = soup.find('h2', text="NL Rookie of the Year Voting").findNext('table', attrs={'id': 'NL_Rookie_of_the_Year_voting'}).findNext('a').text
+        almgr = soup.find('h2', text="AL Mgr of the Year Voting").findNext('table', attrs={'id': 'AL_Mgr_of_the_Year_voting'}).findNext('a').text
+        nlmgr = soup.find('h2', text="NL Mgr of the Year Voting").findNext('table', attrs={'id': 'NL_Mgr_of_the_Year_voting'}).findNext('a').text
         # prepare output string.
         output = "{0} MLB Awards :: MVP: AL {1} NL {2}  CY: AL {3} NL {4}  ROY: AL {5} NL {6}  MGR: AL {7} NL {8}".format( \
             self._red(optyear), self._bold(alvp), self._bold(nlvp), self._bold(alcy), self._bold(nlcy),\
@@ -1286,7 +1286,7 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
             return
         # translate team for url.
-        lookupteam = self._translateTeam('eshort', 'team', optteam) # (db, column, optteam)
+        lookupteam = self._translateTeam('eshort', 'team', optteam)  # (db, column, optteam)
         # build and fetch url.
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi90ZWFtL3NjaGVkdWxlL18vbmFtZQ==') + '/%s/' % lookupteam
         html = self._httpget(url)
@@ -1296,9 +1296,9 @@ class MLB(callbacks.Plugin):
             return
         # now soup the actual html. BS cleans up the RSS because the HTML is junk.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'id':'my-teams-table'})
-        table = div.find('table', attrs={'class':'tablehead'})
-        trs = table.findAll('tr', attrs={'class':re.compile('^evenrow.*|^oddrow.*')})
+        div = soup.find('div', attrs={'id': 'my-teams-table'})
+        table = div.find('table', attrs={'class': 'tablehead'})
+        trs = table.findAll('tr', attrs={'class': re.compile('^evenrow.*|^oddrow.*')})
         #
         container = []
         #
@@ -1342,18 +1342,22 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
+        # sanity check.
+        if "Daily leaders not available" in html:
+            irc.reply("Sorry, mlbdailyleaders is not available right now")
+            return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        mlbdate = soup.find('h1', attrs={'class':'h2'})
-        div = soup.find('div', attrs={'id':'my-players-table'})
+        mlbdate = soup.find('h1', attrs={'class': 'h2'})
+        div = soup.find('div', attrs={'id': 'my-players-table'})
         if not div:
             irc.reply("ERROR: Broken HTML. Check page formatting.")
             return
-        table = div.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'})
+        table = div.find('table', attrs={'class': 'tablehead', 'cellpadding': '3', 'cellspacing': '1'})
         if not table:
             irc.reply("ERROR: Broken HTML. Check page formatting.")
             return
-        rows = table.findAll('tr', attrs={'class':re.compile('evenrow.*|oddrow.*')})
+        rows = table.findAll('tr', attrs={'class': re.compile('evenrow.*|oddrow.*')})
         # container
         mlbdailyleaders = []
         # iterate over each row.
