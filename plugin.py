@@ -2076,36 +2076,30 @@ class MLB(callbacks.Plugin):
         # sanitize.
         pname = self._sanitizeName(pname)
 
-        # need our api key.
-        bingapikey = self.registryValue('bingAPIkey')
-        if not bingapikey or bingapikey == '':
-            self.log.info("You need an API key for bing to be set. Set it and reload the plugin.")
-            return None
-
         # db.
-        if db == "e": # espn.
+        if db == "e":  # espn.
             burl = "site:espn.go.com/mlb/player/ %s" % pname
-        elif db == "r": # rworld.
+        elif db == "r":  # rworld.
             burl = "site:www.rotoworld.com/player/mlb/ %s" % pname
-        elif db == "s": # st.
+        elif db == "s":  # st.
             burl = "site:www.spotrac.com/mlb/ %s" % pname
         elif db == "br": # br.
             burl = "site:www.baseball-reference.com/minors/ %s" % pname
+
         # urlencode.
-        burl = quote_plus("'" + burl + "'")
-
-        # construct url (properly escaped)
-        url = "https://api.datamarket.azure.com/Bing/SearchWeb/v1/Web?Query=%s&$top=20&$format=json" % (burl)
-        # fetch.
         try:
-            r = requests.get(url, auth=(bingapikey, bingapikey))
-            rjson = r.json()
-            rjson = rjson['d']['results'][0]['Url']
-            return rjson
+            burl = quote_plus("'" + burl + "'")
+            url = self._b64decode("aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8=") + "search?q=%s&ie=utf-8&oe=utf-8&aq=t&rls=org.mozilla:en-US:official&client=firefox-a&channel=sb" % (burl)
+            headers = {'User-agent':'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0'}
+            r = requests.get(url, headers=headers)
+            html = BeautifulSoup(r.content)
+            div = html.find('div', attrs={'id':'search'})
+            lnks = div.findAll('a')
+            lnkone = lnks[0]
+            return lnkone['href']
         except Exception as e:
-            print "ERROR:: _pf :: {0}".format(e)
+            self.log.info("ERROR :: _pf :: {0}".format(e))
             return None
-
 
     def _so(self, d):
         """<dict>
