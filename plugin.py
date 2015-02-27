@@ -1941,7 +1941,7 @@ class MLB(callbacks.Plugin):
                 tds = tr.findAll('td')
                 i = tds[0].getText().replace('.', '')  # id.
                 n = tds[1].find('a').getText().encode('utf-8')  # name.
-                activeplayers.append({'id':i, 'full_name':n})
+                activeplayers.append({'id': i, 'full_name': n})
         except Exception, e:
             self.log.info("ERROR: _similarPlayers :: Could not parse source for players :: {0}".format(e))
             return None
@@ -1957,9 +1957,9 @@ class MLB(callbacks.Plugin):
         # iterate over the entries.
         for row in names:  # list of dicts.
             jaroscore = jellyfish.jaro_distance(optname, row['fullname'])  # jaro.
-            damerauscore = jellyfish.damerau_levenshtein_distance(optname, row['fullname'])  #dld
-            jaro.append({'jaro':jaroscore, 'fullname':row['fullname'], 'id':row['id']})  # add dict to list.
-            damerau.append({'damerau':damerauscore, 'fullname':row['fullname'], 'id':row['id']})  # ibid.
+            damerauscore = jellyfish.damerau_levenshtein_distance(optname, row['fullname'])  # dld
+            jaro.append({'jaro': jaroscore, 'fullname': row['fullname'], 'id': row['id']})  # add dict to list.
+            damerau.append({'damerau': damerauscore, 'fullname': row['fullname'], 'id': row['id']})  # ibid.
         # now, we do two "sorts" to find the "top5" matches. reverse is opposite on each.
         jarolist = sorted(jaro, key=itemgetter('jaro'), reverse=True)[0:5]  # bot five.
         dameraulist = sorted(damerau, key=itemgetter('damerau'), reverse=False)[0:5]  # top five.
@@ -1989,17 +1989,17 @@ class MLB(callbacks.Plugin):
             burl = "site:www.rotoworld.com/player/mlb/ %s" % pname
         elif db == "s":  # st.
             burl = "site:www.spotrac.com/mlb/ %s" % pname
-        elif db == "br": # br.
+        elif db == "br":  # br.
             burl = "site:www.baseball-reference.com/minors/ %s" % pname
 
         # urlencode.
         try:
             burl = quote_plus("'" + burl + "'")
             url = self._b64decode("aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8=") + "search?q=%s&ie=utf-8&oe=utf-8&aq=t&rls=org.mozilla:en-US:official&client=firefox-a&channel=sb" % (burl)
-            headers = {'User-agent':'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0'}
+            headers = {'User-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0'}
             r = requests.get(url, headers=headers)
             html = BeautifulSoup(r.content)
-            div = html.find('div', attrs={'id':'search'})
+            div = html.find('div', attrs={'id': 'search'})
             lnks = div.findAll('a')
             lnkone = lnks[0]
             return lnkone['href']
@@ -2013,8 +2013,8 @@ class MLB(callbacks.Plugin):
         Input dict of stats. Order them properly.
         """
 
-        so = ['GP','AB','AVG','HR','RBI','SB','CS','R','H','2B','3B','OBP','SLG','OPS','BB','SO',
-              'IP','W','L','SV','ERA','WHIP','BB','SO','H','HR','HLD','BLSV','R','CG','SHO','WAR']
+        so = ['GP', 'AB', 'AVG', 'HR', 'RBI', 'SB', 'CS', 'R', 'H', '2B', '3B', 'OBP', 'SLG', 'OPS', 'BB', 'SO',
+              'IP', 'W', 'L', 'SV', 'ERA', 'WHIP', 'BB', 'SO', 'H', 'HR', 'HLD', 'BLSV', 'R', 'CG', 'SHO', 'WAR']
         # one liner is always better.
         o = [self._bold(v) + ": " + d[v] for v in so if v in d]
         # we return the list.
@@ -2040,7 +2040,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'class':'table_container'})
+        div = soup.find('div', attrs={'class': 'table_container'})
         if not div:
             irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
             return
@@ -2049,7 +2049,7 @@ class MLB(callbacks.Plugin):
             irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
             return
         # playername:
-        pn = soup.find('span', attrs={'id':'player_name'}).getText().encode('utf-8')
+        pn = soup.find('span', attrs={'id': 'player_name'}).getText().encode('utf-8')
         # columns. bad parsing on BS end. We don't know what comes back. lets do a neat trick here.
         chz = table.find('thead').findAll('th')
         ch = []
@@ -2110,23 +2110,25 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'itemtype':'http://data-vocabulary.org/Person'})
+        div = soup.find('div', attrs={'itemtype': 'http://data-vocabulary.org/Person'})
         if not div:
             irc.reply("ERROR: No player information for '{0}' at '{1}'".format(optplayer, url))
             return
         # now grab their name.
-        n = div.find('span', attrs={'id':'player_name'})
+        n = div.find('span', attrs={'id': 'player_name'})
         pn = n.getText().encode('utf-8')
         n.extract()
         # remove ads/js.
         #[a.extract() for a in div.find('div', attrs={'class':'sr_draftstreet '})]
         [s.extract() for s in div('script')]
         # remove comments.
-        comments = div.findAll(text=lambda text:isinstance(text, Comment))
+        comments = div.findAll(text=lambda text: isinstance(text, Comment))
         [comment.extract() for comment in comments]
         # text.
         t = div.getText(separator=' ').encode('utf-8')
         t = ' '.join(t.split())  # n+1 space = one
+        # remove ads?
+        t = t.replace("Support us without the ads? Go Ad-Free.", "")
         # format for output.
         irc.reply("{0} :: {1}".format(self._bold(pn), t))
 
@@ -2157,7 +2159,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        plrname = soup.find('div', attrs={'class':'playername'})
+        plrname = soup.find('div', attrs={'class': 'playername'})
         if not plrname:
             irc.reply("ERROR: I could not find player's name on: {0}".format(url))
             return
@@ -2165,7 +2167,7 @@ class MLB(callbacks.Plugin):
             plrname = plrname.find('h1').getText().encode('utf-8')
             plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
         # now find the n00z.
-        div = soup.find('div', attrs={'class':'report'})
+        div = soup.find('div', attrs={'class': 'report'})
         if not div:
             irc.reply("ERROR: I could not find player contract for: {0} at {1}".format(optplayer, url))
             return
@@ -2203,7 +2205,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        plrname = soup.find('div', attrs={'class':'playername'})
+        plrname = soup.find('div', attrs={'class': 'playername'})
         if not plrname:
             irc.reply("ERROR: I could not find player's name on: {0}".format(url))
             return
@@ -2211,7 +2213,7 @@ class MLB(callbacks.Plugin):
             plrname = plrname.find('h1').getText().encode('utf-8')
             plrname = plrname.split('|', 1)[0].strip()  # split at | to strip pos. remove double space.
         # now find the n00z.
-        div = soup.find('div', attrs={'class':'playernews'})
+        div = soup.find('div', attrs={'class': 'playernews'})
         if not div:
             irc.reply("ERROR: I could not find player news for: {0} at {1}".format(optplayer, url))
             return
@@ -2253,12 +2255,12 @@ class MLB(callbacks.Plugin):
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         plrname = soup.findAll('h1')[1].getText().encode('utf-8')
-        table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
+        table = soup.find('table', attrs={'class': 'tablehead', 'cellspacing': '1', 'cellpadding': '3'})
         if not table:  # sanity check.
             irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
             return
-        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-        trs = table.findAll('tr', attrs={'class':re.compile('oddrow bi|evenrow bi')})
+        colhead = table.find('tr', attrs={'class': 'colhead'}).findAll('td')
+        trs = table.findAll('tr', attrs={'class': re.compile('oddrow bi|evenrow bi')})
         #
         if len(trs) != 2:
             irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
@@ -2307,10 +2309,10 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        plrname = soup.findAll('h1')[1].getText().encode('utf-8') #soup.find('div', attrs={'class':'mod-article-title player-stats'}).getText()
-        table = soup.find('table', attrs={'class':'tablehead', 'cellspacing':'1', 'cellpadding':'3'})
-        colhead = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-        trs = table.findAll('tr', attrs={'class':re.compile('^evenrow$|^oddrow$')})
+        plrname = soup.findAll('h1')[1].getText().encode('utf-8')
+        table = soup.find('table', attrs={'class': 'tablehead', 'cellspacing': '1', 'cellpadding': '3'})
+        colhead = table.find('tr', attrs={'class': 'colhead'}).findAll('td')
+        trs = table.findAll('tr', attrs={'class': re.compile('^evenrow$|^oddrow$')})
         # sanity check
         if len(trs) == 0:
             print "ERROR: Something went wrong grabbing stats. Check HTML formatting."
@@ -2373,7 +2375,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'class':'mod-content'})
+        div = soup.find('div', attrs={'class': 'mod-content'})
         if not div:
             irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
             return
@@ -2382,7 +2384,7 @@ class MLB(callbacks.Plugin):
         if not pname:
             irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
             return
-        pdiv = div.find('div', attrs={'class':'player-bio'})
+        pdiv = div.find('div', attrs={'class': 'player-bio'})
         if not pdiv:
             irc.reply("ERROR: Could not find player info for: {0}. Check HTML.".format(optplayer))
             return
@@ -2416,24 +2418,24 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        playername = soup.find('div', attrs={'class':'mod-content'}).find('h1').getText()
-        maintable = soup.find('table', attrs={'class':'player-profile-container'})
+        playername = soup.find('div', attrs={'class': 'mod-content'}).find('h1').getText()
+        maintable = soup.find('table', attrs={'class': 'player-profile-container'})
         if not maintable:  # sanity check.
             irc.reply("ERROR: Could not find PREVIOUS or CURRENT game. Check formatting on HTML.")
             return
         # we did find the maintable.
-        mtheader = maintable.find('div', attrs={'class':'mod-header'}).find('h4').getText()
+        mtheader = maintable.find('div', attrs={'class': 'mod-header'}).find('h4').getText()
         # have to look at what's in mtheader to determine the statline. we could probably consolidate this but
         # its easier for me when I have to debug these.
         if 'PREVIOUS GAME' in mtheader:  # previous game.
             # find the details of the previous game.
-            gamedetails = maintable.find('div', attrs={'class':'game-details'})
-            gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-            gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-            gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-            gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-            prevgametable = maintable.find('table', attrs={'class':'tablehead'})
-            prevcolhead = prevgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            gamedetails = maintable.find('div', attrs={'class': 'game-details'})
+            gametime = gamedetails.find('div', attrs={'class': 'time'}).getText(separator=' ')
+            gameaway = gamedetails.find('div', attrs={'class': 'team team-away'}).getText(separator=' ')
+            gamehome = gamedetails.find('div', attrs={'class': 'team team-home'}).getText(separator=' ')
+            gamescore = gamedetails.find('div', attrs={'class': 'scoreboard'}).getText(separator=' ')
+            prevgametable = maintable.find('table', attrs={'class': 'tablehead'})
+            prevcolhead = prevgametable.find('tr', attrs={'class': 'colhead'}).findAll('th')
             prevgame = prevgametable.findAll('tr')[1].findAll('td')
             if prevgame[0].getText() != "This Game":
                 irc.reply("ERROR: I do not have previous game stats for {0} ({1}). Perhaps the player did not play in the game?".format(playername, gametime))
@@ -2443,13 +2445,13 @@ class MLB(callbacks.Plugin):
             statline = self._so(statline)
             irc.reply("{0} :: {1} ({2} @ {3}) :: {4}".format(self._bold(playername), gametime, gameaway, gamehome, " ".join(statline)))
         elif "CURRENT GAME" in mtheader:
-            gamedetails = maintable.find('div', attrs={'class':'game-details'})
-            gametime = gamedetails.find('div', attrs={'class':'time'}).getText(separator=' ')
-            gameaway = gamedetails.find('div', attrs={'class':'team team-away'}).getText(separator=' ')
-            gamehome = gamedetails.find('div', attrs={'class':'team team-home'}).getText(separator=' ')
-            gamescore = gamedetails.find('div', attrs={'class':'scoreboard'}).getText(separator=' ')
-            curgametable = maintable.find('table', attrs={'class':'tablehead'})
-            curcolhead = curgametable.find('tr', attrs={'class':'colhead'}).findAll('th')
+            gamedetails = maintable.find('div', attrs={'class': 'game-details'})
+            gametime = gamedetails.find('div', attrs={'class': 'time'}).getText(separator=' ')
+            gameaway = gamedetails.find('div', attrs={'class': 'team team-away'}).getText(separator=' ')
+            gamehome = gamedetails.find('div', attrs={'class': 'team team-home'}).getText(separator=' ')
+            # gamescore = gamedetails.find('div', attrs={'class': 'scoreboard'}).getText(separator=' ')
+            curgametable = maintable.find('table', attrs={'class': 'tablehead'})
+            curcolhead = curgametable.find('tr', attrs={'class': 'colhead'}).findAll('th')
             curgame = curgametable.findAll('tr')[1].findAll('td')
             if curgame[0].getText() != "This Game":
                 irc.reply("ERROR: I do not have current game stats for {0} ({1}). Perhaps the player is not active?".format(playername, gametime))
