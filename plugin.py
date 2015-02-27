@@ -12,7 +12,6 @@ import collections
 import datetime
 import random
 import sqlite3
-import json
 from itertools import groupby, count
 import os.path
 from base64 import b64decode
@@ -99,14 +98,14 @@ class MLB(callbacks.Plugin):
         """http://code.activestate.com/recipes/303279/#c7"""
 
         c = count()
-        for k, g in groupby(iterable, lambda x:c.next()//size):
+        for k, g in groupby(iterable, lambda x: c.next()//size):
             yield g
 
     def _validate(self, date, format):
         """Return true or false for valid date based on format."""
 
         try:
-            datetime.datetime.strptime(str(date), format) # format = "%m/%d/%Y"
+            datetime.datetime.strptime(str(date), format)  # format = "%m/%d/%Y"
             return True
         except ValueError:
             return False
@@ -121,7 +120,7 @@ class MLB(callbacks.Plugin):
             if h and d:
                 page = utils.web.getUrl(url, headers=h, data=d)
             else:
-                h = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
+                h = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
                 page = utils.web.getUrl(url, headers=h)
             return page
         except Exception as e:
@@ -146,7 +145,7 @@ class MLB(callbacks.Plugin):
     def _millify(self, num):
         """Turns a number like 1,000,000 into 1M."""
 
-        for unit in ['','k','M','B','T']:
+        for unit in ['', 'k', 'M', 'B', 'T']:
             if num < 1000.0:
                 return "%3.3f%s" % (num, unit)
             num /= 1000.0
@@ -212,7 +211,7 @@ class MLB(callbacks.Plugin):
         Display countdown until next MLB opening day.
         """
 
-        y = 2014
+        y = 2015
         oDay = (datetime.datetime(y, 03, 30) - datetime.datetime.now()).days
         irc.reply("{0} day(s) until {1} MLB Opening Day.".format(oDay, y))
 
@@ -267,19 +266,23 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        title = soup.find('h1', attrs={'class':'h2'}).getText()
-        div = soup.find('div', attrs={'id':'my-players-table'})
-        table = div.find('table', attrs={'class':'tablehead'})
-        rows = table.findAll('tr', attrs={'class':re.compile('(odd|even)row.*')})
+        title = soup.find('h1', attrs={'class': 'h2'}).getText()
+        div = soup.find('div', attrs={'id': 'my-players-table'})
+        table = div.find('table', attrs={'class': 'tablehead'})
+        rows = table.findAll('tr', attrs={'class': re.compile('(odd|even)row.*')})
         # container for output.
         mlbstreaks = collections.defaultdict(list)
         # each row is a player. stathead has league.
         for row in rows:
-            league = row.findPrevious('tr', attrs={'class':'stathead'})
+            league = row.findPrevious('tr', attrs={'class': 'stathead'})
             tds = [item.getText() for item in row.findAll('td')]
             player = tds[0]
             streak = tds[2].strip(' games')
             mlbstreaks[league.getText()].append("{0} ({1})".format(player, streak))
+        # check if we have anything to output.
+        if len(mlbstreaks) == 0:
+            irc.reply("I'm sorry, I was unable to find any MLB hitting streaks on {0}".format(url))
+            return
         # output now.
         irc.reply("{0}".format(self._blue(title)))
         for i, x in mlbstreaks.items():
