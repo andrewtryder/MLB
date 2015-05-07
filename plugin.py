@@ -1370,91 +1370,12 @@ class MLB(callbacks.Plugin):
 
     mlbdailyleaders = wrap(mlbdailyleaders)
 
-    def mlbmanager(self, irc, msg, args, optteam):
-        """<team>
-        Display the manager for team.
-        Ex: NYY
+    def mlbwildcard(self, irc, msg, args):
+        """
+        Display AL/NL Wildcard standings.
         """
 
-        # test for valid teams.
-        optteam = self._validteams(optteam)
-        if not optteam:  # team is not found in aliases or validteams.
-            irc.reply("ERROR: Team not found. Valid teams are: {0}".format(self._allteams()))
-            return
-        # build and fetch url.
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9tYW5hZ2Vycw==')
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        rows = soup.findAll('tr', attrs={'class': re.compile('oddrow|evenrow')})
-        # output container. key = team, value = manager.
-        managers = collections.defaultdict(list)
-        # each row is a manager.
-        for row in rows:
-            tds = [item.getText().strip() for item in row.findAll('td')]
-            manager = utils.str.normalizeWhitespace(tds[0])
-            exp = tds[1]
-            record = tds[2]
-            team = tds[3]  # translate it into our abbreviation below.
-            team = self._translateTeam('team', 'fulltrans', team)
-            managers[team] = "{0} :: Manager is {1}({2}) with {3} years experience.".format(self._red(team), self._bold(manager), record, exp)
-        # output time.
-        output = managers.get(optteam)
-        if not output:  # something broke if we didn't find them.
-            irc.reply("ERROR: Something went horribly wrong looking up the manager for: {0}".format(optteam))
-        else:  # we found so output.
-            irc.reply(output)
-
-    mlbmanager = wrap(mlbmanager, [('somethingWithoutSpaces')])
-
-    def mlbstandings(self, irc, msg, args, optlist, optdiv):
-        """[--full|--expanded|--vsdivision] <ALE|ALC|ALW|NLE|NLC|NLW|ALWC|NLWC>
-
-        Display divisional standings for a division.
-        Can also display wild-card standings via ALWC or NLWC.
-        Use --full or --expanded or --vsdivision to show extended stats.
-        Ex: --full ALC or --expanded ALE.
-        """
-
-        # first, check getopts for what to display.
-        full, expanded, vsdivision, wl = False, False, False, False
-        for (option, arg) in optlist:
-            if option == 'full':
-                full = True
-            if option == 'expanded':
-                expanded = True
-            if option == 'vsdivision':
-                vsdivision = True
-            if option == 'wl':
-                wl = True
-        # now check optdiv for the division.
-        optdiv = optdiv.upper()  # upper to match keys. values are in the table to match with the html.
-        leaguetable =   {'ALE': 'American League EAST',
-                         'ALC': 'American League CENTRAL',
-                         'ALW': 'American League WEST',
-                         'NLE': 'National League EAST',
-                         'NLC': 'National League CENTRAL',
-                         'NLW': 'National League WEST',
-                         'ALWC': 'American League AMERICAN',
-                         'NLWC': 'National League NATIONAL'}
-        if optdiv not in leaguetable:  # make sure keys are present.
-            irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
-            return
-
-        # build and fetch url. diff urls depending on option.
-        if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # special url for WC.
-            url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3dpbGQtY2FyZA0K')
-        else:
-            if expanded:
-                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL2V4cGFuZGVk')
-            elif vsdivision:
-                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3MvXy90eXBlL3ZzLWRpdmlzaW9u')
-            else:
-                url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL21sYi9zdGFuZGluZ3M=')
+        url = 'http://sports.yahoo.com/mlb/standings/?alias=wildcard&season='
         # now fetch url.
         html = self._httpget(url)
         if not html:
@@ -1462,75 +1383,66 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')  # one of these below will break if formatting changes.
-        stitle = soup.find('title')  # dirty check for spring training.
-        if stitle and 'Spring Training' in stitle.text:  # we found it.
-            irc.reply("ERROR: I don't do standings during Spring Training. Check back in the regular season.")
-            return
-        div = soup.find('div', attrs={'class': 'mod-container mod-table mod-no-header'})  # div has all
-        table = div.find('table', attrs={'class': 'tablehead'}) # table in there
-        rows = table.findAll('tr', attrs={'class': re.compile('^oddrow.*?|^evenrow.*?')})  # rows are each team
-        # list to hold our defaultdicts.
-        object_list = []
-        lengthlist = collections.defaultdict(list)  # sep data structure to determine length.
-        # each row is something in the standings.
-        for row in rows:
-            league = row.findPrevious('tr', attrs={'class': 'stathead'})
-            header = row.findPrevious('tr', attrs={'class': 'colhead'}).findAll('td')
-            tds = row.findAll('td')
-            # we shove each row (team) into an OD.
-            d = collections.OrderedDict()
-            division = "{0} {1}".format(league.getText(), header[0].getText())
-            # only inject what we need
-            if division == leaguetable[optdiv]:  # from table above. only match what we need.
-                for i, td in enumerate(tds):
-                    if i == 0:  # manual replace of team here because the column doesn't say team.
-                        d['TEAM'] = tds[0].getText()
-                        lengthlist['TEAM'].append(len(tds[0].getText()))
-                    else:
-                        d[header[i].getText()] = td.getText().replace('  ',' ')  # add to ordereddict + conv multispace to one.
-                        lengthlist[header[i].getText()].append(len(td.getText()))  # add key based on header, length of string.
-                object_list.append(d)  # append OD to list.
-        # partial sanity check but more of a cheap copy because of how we output.
-        if len(object_list) > 0:
-            object_list.insert(0, object_list[0])  # copy first item again.
-        else:  # bailout if something broke but most likely did above.
-            irc.reply("ERROR: Something broke returning mlbstandings.")
-            return
-        # now prepare to output.
-        if ((optdiv == "ALWC") or (optdiv == "NLWC")):  # redundant method to handle the wild-card but we need it.
-            wcstandings = []  # list for output.
-            for i, each in enumerate(object_list[1:7]):  # only display 1-5.
-                if wl:  # if we should display win-loss.
-                    wcstandings.append("#{0} {1} ({2}-{3}) {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB']))
-                else:  # regular, no w-l
-                    wcstandings.append("#{0} {1} {2}gb".format(i+1, self._bold(each['TEAM']), each['GB']))
-            irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(wcstandings)))
-        else:  # non wild-card stuff.
-            if ((not full) and (not expanded) and (not vsdivision)):  # display short.
-                divstandings = []  # list for output.
-                for i, each in enumerate(object_list[1:]):  # skip the first since its the header. iterate through to format+append.
-                    divstr = "#{0} {1} {2}-{3} {4}gb".format(i+1, self._bold(each['TEAM']), each['W'], each['L'], each['GB'])
-                    divstandings.append(divstr)  # append.
-                # now output the short.
-                irc.reply("{0} standings :: {1}".format(self._red(optdiv), " | ".join(divstandings)))
-            else:  # display full rankings.
-                for i, each in enumerate(object_list):
-                    if i == 0:  # to print the duplicate but only output the header of the table.
-                        headerOut = ""
-                        for keys in each.keys():  # only keys on the first list entry, a dummy/clone.
-                            headerOut += "{0:{1}}".format(self._ul(keys), max(lengthlist[keys])+4, key=int)  # normal +2 but bold eats up +2 more, so +4.
-                        irc.reply(headerOut)  # output header.
-                    else:  # print the division now.
-                        tableRow = ""  # empty string we += to with each "row".
-                        for inum, k in enumerate(each.keys()):
-                            if inum == 0:  # team here, which we want to bold.
-                                tableRow += "{0:{1}}".format(self._bold(each[k]), max(lengthlist[k])+4, key=int)  #+4 since bold eats +2.
-                            else:  # rest of the elements outside the team.
-                                tableRow += "{0:{1}}".format(each[k], max(lengthlist[k])+2, key=int)
-                        irc.reply(tableRow)  # output.
+        d = collections.defaultdict(list)
+        soup = BeautifulSoup(html)  # one of these below will break if formatting changes.
+        ths = soup.findAll('td', attrs={'title':'WC Games Back'})
+        for i in ths:
+            p = i.findPrevious('tr')
+            league = p.findPrevious('h4').getText()
+            team = p.find('th', attrs={'class':'team'}).getText()
+            gb = p.find('td', attrs={'title':'WC Games Back'}).getText()
+            d[league].append("{0} {1}".format(team, gb))
+        #
+        for (z, x) in d.items():
+            irc.reply("{0} :: {1}".format(z, ", ".join([a for a in x])))
 
-    mlbstandings = wrap(mlbstandings, [getopts({'wl': '', 'full': '', 'expanded': '', 'vsdivision': ''}), ('somethingWithoutSpaces')])
+    mlbwildcard = wrap(mlbwildcard)
+
+    def mlbstandings(self, irc, msg, args, optdiv):
+        """<ALE|ALC|ALW|NLE|NLC|NLW>
+
+        Display division standings.
+        """
+
+        optdiv = optdiv.upper()  # upper to match keys. values are in the table to match with the html.
+        leaguetable =   {'ALE': 'American League East',
+                         'ALC': 'American League Central',
+                         'ALW': 'American League West',
+                         'NLE': 'National League East',
+                         'NLC': 'National League Central',
+                         'NLW': 'National League West'}
+        if optdiv not in leaguetable:  # make sure keys are present.
+            irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
+            return
+
+        # build and fetch url. diff urls depending on option.
+        url = 'http://sports.yahoo.com/mlb/standings/'
+        # now fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
+        d = []
+        soup = BeautifulSoup(html)  # one of these below will break if formatting changes.
+        ths = soup.findAll('td', attrs={'title':'Win Percentage'})
+        for i in ths:
+            p = i.findParent('tr')
+            league = p.findPrevious('h4').getText()
+            div = p.findPrevious('h5').getText()
+            team = p.find('th').getText()
+            gb = p.find('td', attrs={'title':'Games Back'}).getText()
+            d.append("{0} {1} {2} {3}".format(league, div, team, gb))
+        # now output
+        o = []
+        for z in d:
+            if leaguetable[optdiv] in z:
+                o.append(z.replace(leaguetable[optdiv], ''))
+        # output to irc.
+        irc.reply("{0} :: {1}".format(optdiv, ", ".join([i for i in o])))
+
+    mlbstandings = wrap(mlbstandings, [('somethingWithoutSpaces')])
 
     def mlblineup(self, irc, msg, args, optteam):
         """<team>
