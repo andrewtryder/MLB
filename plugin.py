@@ -1620,7 +1620,7 @@ class MLB(callbacks.Plugin):
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        plrname = soup.findAll('h1')[1].getText().encode('utf-8')
+        plrname = soup.findAll('h1')[0].getText().encode('utf-8')
         table = soup.find('table', attrs={'class': 'tablehead', 'cellspacing': '1', 'cellpadding': '3'})
         colhead = table.find('tr', attrs={'class': 'colhead'}).findAll('td')
         trs = table.findAll('tr', attrs={'class': re.compile('^evenrow$|^oddrow$')})
