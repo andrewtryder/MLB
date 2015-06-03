@@ -1565,7 +1565,7 @@ class MLB(callbacks.Plugin):
             return None
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        plrname = soup.findAll('h1')[1].getText().encode('utf-8')
+        plrname = soup.findAll('h1')[0].getText().encode('utf-8')
         table = soup.find('table', attrs={'class': 'tablehead', 'cellspacing': '1', 'cellpadding': '3'})
         if not table:  # sanity check.
             irc.reply("ERROR: Something went wrong looking up career stats for: {0}. Check formatting.".format(optplayer))
@@ -1588,6 +1588,55 @@ class MLB(callbacks.Plugin):
         irc.reply("{0} :: Career Totals :: {1}".format(self._bold(plrname), " | ".join([i for i in careertotals])))
 
     mlbcareerstats = wrap(mlbcareerstats, [('text')])
+    
+    def mlbgame(self, irc, msg, args, optplayer):
+        """<player name"
+
+        Try to fetch game stats (in or previous) for player.
+        Ex: David Ortiz
+        """
+
+        # try and grab a player.
+        url = self._pf('e', optplayer)
+        if not url:
+            irc.reply("ERROR: I could not find a player page for: {0}".format(optplayer))
+            # lets try to help them out with similar names.
+            sp = self._similarPlayers(optplayer)
+            if sp:  # if we get something back, lets return the fullnames.
+                irc.reply("Possible suggestions: {0}".format(" | ".join([i['fullname'].title() for i in sp])))
+            # now exit regardless.
+            return
+        # we do have url now. fetch it.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return None
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        testtd = soup.find('td', text="This Game")
+        if not testtd:
+            irc.reply("ERROR: I did not find current/previous game stats for {0}".format(optplayer))
+            return
+        # continue
+        plrname = soup.findAll('h1')[0].getText().encode('utf-8')
+        # otherwise.
+        venue = soup.find('div', attrs={'class':'game-details'})
+        vtime = venue.find('div', attrs={'class':'time'}).getText(separator=' ').encode('utf-8')
+        voverview = venue.find('div', attrs={'class':'overview'}).getText(separator=' ').encode('utf-8')
+        # table
+        table = soup.find('table', attrs={'class': 'tablehead', 'cellspacing': '1', 'cellpadding': '3'})
+        # colhead.
+        colhead = table.find('tr', attrs={'class': 'colhead'})
+        chs = colhead.findAll('th')
+        # row
+        firstrow = table.findAll('tr')[1].findAll('td')
+        # mate them together
+        statz = " ".join([chs[i+1].getText() + ": " + v.getText() for (i, v) in enumerate(firstrow[1:])])
+
+        irc.reply("{0} :: {1} :: {2} :: {3}".format(plrname, vtime, voverview, statz))
+    
+    mlbgame = wrap(mlbgame, [('text')])
 
     def mlbseasonstats(self, irc, msg, args, optyear, optplayer):
         """<year> <player name>
