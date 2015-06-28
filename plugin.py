@@ -271,15 +271,18 @@ class MLB(callbacks.Plugin):
             tn = game.findNext('em')
             if tn:
                 tn = str(tn.getText())
-                gid = game.findPrevious('tbody', attrs={'class':re.compile('game link')})['data-url']
-                tn = self._translateTeam('team', 'yname', tn) 
-                teamdict[tn] = gid
+                gid = game.findPrevious('tbody', attrs={'class':re.compile('game link')})
+                if gid:
+                    gid = game.findPrevious('tbody', attrs={'class':re.compile('game link')})['data-url']
+                    if 'data-url' in gid:
+                        tn = self._translateTeam('team', 'yname', tn) 
+                        teamdict[tn] = gid
         # grab the gameid. fetch.
         teamgameids = teamdict.get(optteam)
         # sanity check before we grab the game.
         # self.log.info("TEAMGAMEIDS: {0}".format(teamgameids))
         if not teamgameids:
-            irc.reply("ERROR: No upcoming/active games with: {0}".format(optteam))
+            irc.reply("ERROR: No upcoming/active games with: {0}. Check closer to gametime.".format(optteam))
             return
         # fetch the game
         url = "http://sports.yahoo.com" + teamgameids
