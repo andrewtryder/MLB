@@ -21,5 +21,4 @@ class MLBTestCase(PluginTestCase):
         self.assertNotError('mlballstargame 2013')
         self.assertNotError('mlbarrests')
         self.assertNotError('mlbawards 2013')
-        self.assertNotError('mlbbox NYY')
         self.assertNotError('mlbcareerleaders batting batavg')
