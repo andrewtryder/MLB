@@ -11,39 +11,39 @@ CREATE TABLE mlb (
     st TEXT,
     mlbc TEXT,
     cbs TEXT,
-    playoffs TEXT
+    yname TEXT
 );
 /* ONE ROW PER TEAM */
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('ARI','29','ARZ','Arizona Diamondbacks','Arizona','diamondbacks','ari','ari','arizona-diamondbacks','ari','ari','diamondbacks');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('ATL','15','ATL','Atlanta Braves','Atlanta','braves','atl','atl','atlanta-braves','atl','atl','braves');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('BAL','1','BAL','Baltimore Orioles','Baltimore','orioles','bal','bal','baltimore-orioles','bal','bal','orioles');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('BOS','2','BOS','Boston Red Sox','Boston','redsox','bos','bos','boston-red-sox','bos','bos','red sox');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('CHC','16','CHC','Chicago Cubs','Chicago Cubs','cubs','chc','chc','chicago-cubs','chc','chc','cubs');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('CIN','17','CIN','Cincinnati Reds','Cincinnati','reds','cin','cin','cincinnati-reds','cin','cin','reds');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('CLE','5','CLE','Cleveland Indians','Cleveland','indians','cle','cle','cleveland-indians','cle','cle','indians');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('COL','27','COL','Colorado Rockies','Colorado','rockies','col','col','colorado-rockies','col','col','rockies');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('CWS','4','CWS','Chicago White Sox','Chicago Sox','whitesox','chw','chw','chicago-white-sox','cws','chw','white sox');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('DET','6','DET','Detroit Tigers','Detroit','tigers','det','det','detroit-tigers','det','det','tigers');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('HOU','18','HOU','Houston Astros','Houston','astros','hou','hou','houston-astros','hou','hou','astros');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('KC','7','KC','Kansas City Royals','Kansas City','royals','kan','kc','kansas-city-royals','kc','kc','royals');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('LAA','3','ANA','Los Angeles Angels','LA Angels','angels','laa','laa','los-angeles-angels','ana','laa','angels');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('LAD','19','LA','Los Angeles Dodgers','LA Dodgers','dodgers','lad','lad','los-angeles-dodgers','lad','lad','dodgers');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('MIA','28','FLA','Miami Marlins','Miami','Miami','mia','mia','miami-marlins','mia','mia','marlins');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('MIL','8','MLW','Milwaukee Brewers','Milwaukee','brewers','mil','mil','milwaukee-brewers','mil','mil','brewers');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('MIN','9','MIN','Minnesota Twins','Minnesota','twins','min','min','minnesota-twins','min','min','twins');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('NYM','21','NYM','New York Mets','NY Mets','mets','nym','nym','new-york-mets','nym','nym','mets');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('NYY','10','NYY','New York Yankees','NY Yankees','yankees','nyy','nyy','new-york-yankees','nyy','nyy','yankees');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('OAK','11','OAK','Oakland Athletics','Oakland','athletics','oak','oak','oakland-athletics','oak','oak','athletics');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('PHI','22','PHI','Philadelphia Phillies','Philadelphia','phillies','phi','phi','philadelphia-phillies','phi','phi','phillies');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('PIT','23','PIT','Pittsburgh Pirates','Pittsburgh','pirates','pit','pit','pittsburgh-pirates','pit','pit','pirates');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('SD','25','SD','San Diego Padres','San Diego','padres','sdg','sd','san-diego-padres','sd','sd','padres');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('SEA','12','SEA','Seattle Mariners','Seattle','mariners','sea','sea','seattle-mariners','sea','sea','mariners');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('SF','26','SF','San Francisco Giants','San Francisco','giants','sfo','sf','san-francisco-giants','sf','sf','giants');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('STL','24','STL','St. Louis Cardinals','St. Louis','cardinals','stl','stl','st.-louis-cardinals','stl','stl','cardinals');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('TB','30','TB','Tampa Bay Rays','Tampa Bay','rays','tam','tb','tampa-bay-rays','tb','tb','rays');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('TEX','13','TEX','Texas Rangers','Texas','rangers','tex','tex','texas-rangers','tex','tex','rangers');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('TOR','14','TOR','Toronto Blue Jays','Toronto','bluejays','tor','tor','toronto-blue-jays','tor','tor','blue jays');
-INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,playoffs) values ('WSH','20','WAS','Washington Nationals','Washington','nationals','was','wsh','washington-nationals','was','was','nationals');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('ARI','29','ARZ','Arizona Diamondbacks','Arizona','diamondbacks','ari','ari','arizona-diamondbacks','ari','ari','Arizona');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('ATL','15','ATL','Atlanta Braves','Atlanta','braves','atl','atl','atlanta-braves','atl','atl','Atlanta');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('BAL','1','BAL','Baltimore Orioles','Baltimore','orioles','bal','bal','baltimore-orioles','bal','bal','Baltimore');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('BOS','2','BOS','Boston Red Sox','Boston','redsox','bos','bos','boston-red-sox','bos','bos','Boston');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('CHC','16','CHC','Chicago Cubs','Chicago Cubs','cubs','chc','chc','chicago-cubs','chc','chc','Chi Cubs');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('CIN','17','CIN','Cincinnati Reds','Cincinnati','reds','cin','cin','cincinnati-reds','cin','cin','Cincinnati');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('CLE','5','CLE','Cleveland Indians','Cleveland','indians','cle','cle','cleveland-indians','cle','cle','Cleveland');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('COL','27','COL','Colorado Rockies','Colorado','rockies','col','col','colorado-rockies','col','col','Colorado');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('CWS','4','CWS','Chicago White Sox','Chicago Sox','whitesox','chw','chw','chicago-white-sox','cws','chw','Chi White Sox');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('DET','6','DET','Detroit Tigers','Detroit','tigers','det','det','detroit-tigers','det','det','Detroit');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('HOU','18','HOU','Houston Astros','Houston','astros','hou','hou','houston-astros','hou','hou','Houston');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('KC','7','KC','Kansas City Royals','Kansas City','royals','kan','kc','kansas-city-royals','kc','kc','Kansas City');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('LAA','3','ANA','Los Angeles Angels','LA Angels','angels','laa','laa','los-angeles-angels','ana','laa','LA Angels');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('LAD','19','LA','Los Angeles Dodgers','LA Dodgers','dodgers','lad','lad','los-angeles-dodgers','lad','lad','LA Dodgers');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('MIA','28','FLA','Miami Marlins','Miami','Miami','mia','mia','miami-marlins','mia','mia','Miami');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('MIL','8','MLW','Milwaukee Brewers','Milwaukee','brewers','mil','mil','milwaukee-brewers','mil','mil','Milwaukee');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('MIN','9','MIN','Minnesota Twins','Minnesota','twins','min','min','minnesota-twins','min','min','Minnesota');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('NYM','21','NYM','New York Mets','NY Mets','mets','nym','nym','new-york-mets','nym','nym','NY Mets');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('NYY','10','NYY','New York Yankees','NY Yankees','yankees','nyy','nyy','new-york-yankees','nyy','nyy','NY Yankees');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('OAK','11','OAK','Oakland Athletics','Oakland','athletics','oak','oak','oakland-athletics','oak','oak','Oakland');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('PHI','22','PHI','Philadelphia Phillies','Philadelphia','phillies','phi','phi','philadelphia-phillies','phi','phi','Philadelphia');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('PIT','23','PIT','Pittsburgh Pirates','Pittsburgh','pirates','pit','pit','pittsburgh-pirates','pit','pit','Pittsburgh');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('SD','25','SD','San Diego Padres','San Diego','padres','sdg','sd','san-diego-padres','sd','sd','San Diego');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('SEA','12','SEA','Seattle Mariners','Seattle','mariners','sea','sea','seattle-mariners','sea','sea','Seattle');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('SF','26','SF','San Francisco Giants','San Francisco','giants','sfo','sf','san-francisco-giants','sf','sf','San Francisco');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('STL','24','STL','St. Louis Cardinals','St. Louis','cardinals','stl','stl','st.-louis-cardinals','stl','stl','St. Louis');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('TB','30','TB','Tampa Bay Rays','Tampa Bay','rays','tam','tb','tampa-bay-rays','tb','tb','Tampa Bay');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('TEX','13','TEX','Texas Rangers','Texas','rangers','tex','tex','texas-rangers','tex','tex','Texas');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('TOR','14','TOR','Toronto Blue Jays','Toronto','bluejays','tor','tor','toronto-blue-jays','tor','tor','Toronto');
+INSERT INTO mlb (team,eid,roto,fulltrans,ename,short,yahoo,eshort,st,mlbc,cbs,yname) values ('WSH','20','WAS','Washington Nationals','Washington','nationals','was','wsh','washington-nationals','was','was','Washington');
 
 /* MLB TEAM ALIASES */
 CREATE TABLE mlbteamaliases (
