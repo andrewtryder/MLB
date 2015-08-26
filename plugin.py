@@ -294,6 +294,8 @@ class MLB(callbacks.Plugin):
             self.log.error("ERROR opening {0}".format(url))
             return
         soup = BeautifulSoup(html) #, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        #bb = soup.findAll('h3')
+        #self.log.info("{0}".format(bb))
         pitching = soup.find('h3', text="Pitching")
         if not pitching:
             irc.reply("ERROR: I could not find pitching. Use command once game is active/finished.")
@@ -1215,7 +1217,8 @@ class MLB(callbacks.Plugin):
             for tr in trs:
                 tds = tr.findAll('td')
                 i = tds[0].getText().replace('.', '')  # id.
-                n = tds[1].find('a').getText().encode('utf-8')  # name.
+                n = tds[1].find('a').getText() #.encode('utf-8')  # name.
+                #n = ftfy.fix_text(n)
                 activeplayers.append({'id': i, 'full_name': n})
         except Exception, e:
             self.log.info("ERROR: _similarPlayers :: Could not parse source for players :: {0}".format(e))
@@ -1226,15 +1229,20 @@ class MLB(callbacks.Plugin):
             return None
         # ok, finally, lets go.
         optname = self._sanitizeName(optname)  # sanitizename.
+        optname = unicode(optname)  # must be unicode.
         jaro, damerau = [], []  # empty lists to put our results in.
         # now we create the container to iterate over.
         names = [{'fullname': self._sanitizeName(v['full_name']), 'id':v['id']} for v in activeplayers]  # full_name # last_name # first_name
         # iterate over the entries.
         for row in names:  # list of dicts.
-            jaroscore = jellyfish.jaro_distance(optname, row['fullname'])  # jaro.
-            damerauscore = jellyfish.damerau_levenshtein_distance(optname, row['fullname'])  # dld
-            jaro.append({'jaro': jaroscore, 'fullname': row['fullname'], 'id': row['id']})  # add dict to list.
-            damerau.append({'damerau': damerauscore, 'fullname': row['fullname'], 'id': row['id']})  # ibid.
+            try:  # some error stuff.
+                jaroscore = jellyfish.jaro_distance(optname, row['fullname'])  # jaro.
+                damerauscore = jellyfish.damerau_levenshtein_distance(optname, row['fullname'])  # dld
+                jaro.append({'jaro': jaroscore, 'fullname': row['fullname'], 'id': row['id']})  # add dict to list.
+                damerau.append({'damerau': damerauscore, 'fullname': row['fullname'], 'id': row['id']})  # ibid.
+            except Exception as e:
+                self.log.info("_similarPlayers :: ERROR :: {0} :: {1}".format(row, e))
+                continue
         # now, we do two "sorts" to find the "top5" matches. reverse is opposite on each.
         jarolist = sorted(jaro, key=itemgetter('jaro'), reverse=True)[0:5]  # bot five.
         dameraulist = sorted(damerau, key=itemgetter('damerau'), reverse=False)[0:5]  # top five.
@@ -1276,6 +1284,8 @@ class MLB(callbacks.Plugin):
             html = BeautifulSoup(r.content)
             div = html.find('div', attrs={'id': 'search'})
             lnks = div.findAll('a')
+            if len(lnks) == 0:
+                return None
             lnkone = lnks[0]
             return lnkone['href']
         except Exception as e:
