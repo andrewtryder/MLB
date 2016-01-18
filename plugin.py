@@ -202,11 +202,25 @@ class MLB(callbacks.Plugin):
         Display countdown until next MLB opening day.
         """
 
-        y = 2015
-        oDay = (datetime.datetime(y, 03, 30) - datetime.datetime.now()).days
-        irc.reply("{0} day(s) until {1} MLB Opening Day.".format(oDay, y))
+        oDate = {"year": 2016, "month": 04, "day": 04}
+        stDate = {"year": 2016, "month": 02, "day": 17}
+        oDay = (datetime.datetime(oDate["year"], oDate["month"], oDate["day"]) - datetime.datetime.now()).days
+        pDay = (datetime.datetime(stDate["year"], stDate["month"], stDate["day"]) - datetime.datetime.now()).days
+        irc.reply("{0} day(s) until {1} MLB Opening Day ({2}/{3}/{4}). {5} day(s) until pitchers and catchers report ({6}/{7}/{8}).".format(
+            oDay, oDate["year"], oDate["month"], oDate["day"], oDate["year"], pDay, stDate["month"], stDate["day"], stDate["year"]))
 
     mlbcountdown = wrap(mlbcountdown)
+
+    def springtraining(self, irc, msg, args):
+        """
+        Display countdown until spring training.
+        """
+        
+        date = {"year": 2016, "month": 02, "day": 17}
+        stDay = (datetime.datetime(date["year"], date["month"], date["day"]) - datetime.datetime.now()).days
+        irc.reply("{0} day(s) until {1} Spring Training begins. ({2}/{3}/{4})".format(stDay, date["year"], date["month"], date["day"], date["year"]))
+
+    springtraining = wrap(springtraining)
 
     def mlbteams(self, irc, msg, args):
         """
