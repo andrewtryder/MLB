@@ -216,11 +216,17 @@ class MLB(callbacks.Plugin):
         Display countdown until spring training.
         """
         
-        date = {"year": 2016, "month": 02, "day": 17}
-        stDay = (datetime.datetime(date["year"], date["month"], date["day"]) - datetime.datetime.now()).days
-        irc.reply("{0} day(s) until {1} Spring Training begins. ({2}/{3}/{4})".format(stDay, date["year"], date["month"], date["day"], date["year"]))
+        # change this values year to year (TODO: registry values)
+        pcDate = {'year': 2016, 'month': 02, 'day': 17}
+        fgDate = {'year': 2016, 'month': 03, 'day': 01}
 
-    springtraining = wrap(springtraining)
+        pcDateStr = '{0}/{1}/{2}'.format(pcDate['month'], pcDate['day'], pcDate['year'])
+        fgDateStr = '{0}/{1}/{2}'.format(fgDate['month'], fgDate['day'], fgDate['year'])
+
+        pcDays = (datetime.datetime(pcDate['year'], pcDate['month'], pcDate['day']) - datetime.datetime.now()).days
+        fgDays = (datetime.datetime(fgDate['year'], fgDate['month'], fgDate['day']) - datetime.datetime.now()).days
+        irc.reply("{0} day(s) until pitchers and catchers report ({1}). {2} day(s) until the first spring training game ({3}).".format(
+            pcDays, pcDateStr, fgDays, fgDateStr))
 
     def mlbteams(self, irc, msg, args):
         """
