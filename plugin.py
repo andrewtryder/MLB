@@ -332,7 +332,7 @@ class MLB(callbacks.Plugin):
             t = []
             for col in cols:
                 previoushead = col.findPrevious('thead').findAll('th')
-                pname = col.find('th').getText().encode('utf-8')
+                pname = col.find('th').getText().encode('utf-8').replace('DFP','')
                 rest = " ".join([self._bold(colhead[k+1].getText()) + ": " + z.getText() for (k, z) in enumerate(col.findAll('td'))])
                 t.append("{0} {1}".format(pname, rest))
             t = " | ".join(t)
