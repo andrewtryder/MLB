@@ -923,26 +923,33 @@ class MLB(callbacks.Plugin):
         Display AL/NL Wildcard standings.
         """
 
-        url = 'http://sports.yahoo.com/mlb/standings/?alias=wildcard&season='
+        url = 'http://m.mlb.com/standings/?view=wildcard'
         # now fetch url.
-        html = self._httpget(url)
-        if not html:
+        page = requests.get(url)
+        if not page:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
-        d = collections.defaultdict(list)
-        soup = BeautifulSoup(html)  # one of these below will break if formatting changes.
-        ths = soup.findAll('td', attrs={'title':'WC Games Back'})
-        for i in ths:
-            p = i.findPrevious('tr')
-            league = p.findPrevious('h4').getText()
-            team = p.find('th', attrs={'class':'team'}).getText()
-            gb = p.find('td', attrs={'title':'WC Games Back'}).getText()
-            d[league].append("{0} {1}".format(team, gb))
+        tree = html.fromstring(page.content)
+        alwct = tree.xpath('//*[@id="league-103"]/table[2]//span[@class="title-short"]/text()')
+        alwcg = tree.xpath('//*[@id="league-103"]/table[2]//td[@class="standings-col-gb"]/text()')
+        nlwct = tree.xpath('//*[@id="league-104"]/table[2]//span[@class="title-short"]/text()')
+        nlwcg = tree.xpath('//*[@id="league-104"]/table[2]//td[@class="standings-col-gb"]/text()')
+        out = collections.defaultdict(list)
+        for idx, val in enumerate(alwct):
+            if idx > 0:
+                out["ALWC"].append("{0} -{1}".format(self._bold(val), alwcg[idx]))
+            else:
+                out["ALWC"].append("{0} {1}".format(self._bold(val), alwcg[idx]))
+        for idx, val in enumerate(nlwct):
+            if idx > 0:
+                out["NLWC"].append("{0} -{1}".format(self._bold(val), nlwcg[idx]))
+            else:
+                out["NLWC"].append("{0} {1}".format(self._bold(val), nlwcg[idx]))
         #
-        for (z, x) in d.items():
-            irc.reply("{0} :: {1}".format(z, ", ".join([a for a in x])))
+        for (z, x) in list(out.items()):
+            irc.reply("{0} :: {1}".format(self._bold(z), ", ".join([a for a in x])))
 
     mlbwildcard = wrap(mlbwildcard)
 
