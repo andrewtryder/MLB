@@ -6,6 +6,7 @@
 # my libs.
 from BeautifulSoup import BeautifulSoup, Comment
 from urllib import quote_plus
+from lxml import html
 import requests
 import re
 import collections
@@ -952,42 +953,33 @@ class MLB(callbacks.Plugin):
         """
 
         optdiv = optdiv.upper()  # upper to match keys. values are in the table to match with the html.
-        leaguetable =   {'ALE': 'American League East',
-                         'ALC': 'American League Central',
-                         'ALW': 'American League West',
-                         'NLE': 'National League East',
-                         'NLC': 'National League Central',
-                         'NLW': 'National League West'}
+        leaguetable = {'ALE': '//*[@id="league-103"]/table[1]',
+                       'ALC': '//*[@id="league-103"]/table[2]',
+                       'ALW': '//*[@id="league-103"]/table[3]',
+                       'NLE': '//*[@id="league-104"]/table[1]',
+                       'NLC': '//*[@id="league-104"]/table[2]',
+                       'NLW': '//*[@id="league-104"]/table[3]'}
         if optdiv not in leaguetable:  # make sure keys are present.
             irc.reply("ERROR: League must be one of: {0}".format(" | ".join(sorted(leaguetable.keys()))))
             return
 
         # build and fetch url. diff urls depending on option.
-        url = 'http://sports.yahoo.com/mlb/standings/'
+        url = 'http://m.mlb.com/standings/'
         # now fetch url.
-        html = self._httpget(url)
-        if not html:
+        page = requests.get(url)
+        if not page:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
             return
         # process html.
-        d = []
-        soup = BeautifulSoup(html)  # one of these below will break if formatting changes.
-        ths = soup.findAll('td', attrs={'title':'Win Percentage'})
-        for i in ths:
-            p = i.findParent('tr')
-            league = p.findPrevious('h4').getText()
-            div = p.findPrevious('h5').getText()
-            team = p.find('th').getText()
-            gb = p.find('td', attrs={'title':'Games Back'}).getText()
-            d.append("{0} {1} {2} {3}".format(league, div, team, gb))
-        # now output
-        o = []
-        for z in d:
-            if leaguetable[optdiv] in z:
-                o.append(z.replace(leaguetable[optdiv], ''))
+        tree = html.fromstring(page.content)
+        teams = tree.xpath('{0}//span[@class="title-short"]/text()'.format(leaguetable[optdiv]))
+        gb = tree.xpath('{0}//td[@class="standings-col-gb"]/text()'.format(leaguetable[optdiv]))
+        out = []
+        for idx, val in enumerate(teams):
+            out.append("{0} -{1}".format(val, gb[idx]))
         # output to irc.
-        irc.reply("{0} :: {1}".format(optdiv, ", ".join([i for i in o])))
+        irc.reply("{0} :: {1}".format(optdiv, ", ".join([i for i in out])))
 
     mlbstandings = wrap(mlbstandings, [('somethingWithoutSpaces')])
 
